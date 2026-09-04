@@ -38,9 +38,25 @@ export const portraitSchema = z.object({
   behavior_sparse: z.boolean(),
 });
 
+export const modelOutputSchema = z.object({
+  claims: z.array(
+    z.object({
+      claim_type: claimTypeSchema,
+      confidence: confidenceSchema,
+      statement: z.string().min(1),
+      evidence: z.array(z.string()),
+      reasoning: z.string().min(1),
+      falsifier: z.string().min(1),
+    }),
+  ),
+  declined: z.array(declinedSchema),
+  thin_signal_note: z.string().nullable(),
+});
+
 export type Claim = z.infer<typeof claimSchema>;
 export type Declined = z.infer<typeof declinedSchema>;
 export type Portrait = z.infer<typeof portraitSchema>;
+export type ModelOutput = z.infer<typeof modelOutputSchema>;
 
 export const groundTruthSchema = z.partialRecord(
   claimTypeSchema,

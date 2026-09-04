@@ -1,0 +1,7 @@
+name = "glasshouse"
+main = "src/index.ts"
+compatibility_date = "2026-09-04"
+
+[vars]
+AWS_REGION = "us-east-1"
+LAMBDA_URL = "https://isoklo6atfhejqkyjot26jhkjm0sdxri.lambda-url.us-east-1.on.aws"

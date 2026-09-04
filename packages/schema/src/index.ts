@@ -5,7 +5,6 @@ export {
   TIER_MIDPOINTS,
   type Confidence,
 } from "./confidence.ts";
-export { canonicalize, hashSignalSet } from "./hash.ts";
 export { asSignalSet } from "./parse.ts";
 export { hitsProhibited } from "./prohibited.ts";
 export {
@@ -15,6 +14,7 @@ export {
   declinedSchema,
   fixtureSchema,
   groundTruthSchema,
+  modelOutputSchema,
   portraitSchema,
   signalIdSchema,
   signalTierSchema,
@@ -22,6 +22,7 @@ export {
   type Declined,
   type Fixture,
   type GroundTruth,
+  type ModelOutput,
   type Portrait,
 } from "./portrait.ts";
 export {

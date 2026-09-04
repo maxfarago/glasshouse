@@ -5,13 +5,19 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "bundle:lambda": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/lambda.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.62.0",
+    "@aws-sdk/client-dynamodb": "^3.887.0",
+    "@aws-sdk/client-secrets-manager": "^3.887.0",
+    "@aws-sdk/util-dynamodb": "^3.887.0",
     "@glasshouse/schema": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "esbuild": "^0.25.9",
     "typescript": "^5.9.2"
   }
 }

@@ -3,6 +3,7 @@
 model_id: stub-v0
 repeats: 3
 fixtures: 3
+mean_brier: 0.29
 
 ## summary
 
@@ -11,6 +12,15 @@ fixtures: 3
 | ios-lockdown-empty | sanitized | 7 | 1 | 1.00 | 0.20 | 0.13 | 1.00 |
 | macbook-chrome-home | sanitized | 8 | 1 | 1.00 | 0.33 | 0.11 | 1.00 |
 | vpn-datacenter-mullvad | sanitized | 8 | 1 | 1.00 | 0.34 | 0.11 | 1.00 |
+
+## reliability
+
+| tier | n | hits | hit_rate |
+|---|---|---|---|
+| HUNCH | 4 | 4 | 1.00 |
+| PLAUSIBLE | 10 | 10 | 1.00 |
+| LIKELY | 7 | 7 | 1.00 |
+| CONFIDENT | 0 | 0 | — |
 
 ## ios-lockdown-empty
 

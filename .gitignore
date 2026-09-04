@@ -6,3 +6,6 @@ dist
 *.log
 evals/fixtures.local/
 evals/reports/*.tmp.md
+infra/build/
+apps/worker/.dev.vars
+apps/worker/.wrangler/

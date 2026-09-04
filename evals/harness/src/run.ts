@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { stubInference } from "@glasshouse/inference";
+import { resolveInference } from "@glasshouse/inference";
 import { validatePortrait, type Drop, type Portrait } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
 import { clipToTiers, loadFixtures } from "./load.ts";
@@ -12,9 +12,10 @@ function repoRoot(): string {
 }
 
 function arg(flag: string, fallback: string): string {
-  const i = process.argv.indexOf(flag);
+  const argv = process.argv.filter((a) => a !== "--");
+  const i = argv.indexOf(flag);
   if (i < 0) return fallback;
-  const v = process.argv[i + 1];
+  const v = argv[i + 1];
   return v ? v : fallback;
 }
 
@@ -22,6 +23,7 @@ export async function run(): Promise<string> {
   const promptVersion = arg("--prompt", "stub");
   const repeats = Number.parseInt(arg("--repeats", "3"), 10);
   const root = repoRoot();
+  const inference = await resolveInference(promptVersion, root);
   const fixtures = await loadFixtures(root);
   if (fixtures.length === 0) throw new Error("no fixtures found in evals/fixtures");
 
@@ -31,8 +33,9 @@ export async function run(): Promise<string> {
     const dropsPerRun: Drop[][] = [];
     const clipped = clipToTiers(fixture.signals, fixture.tiers_available);
     const signals = derive(clipped, { now: new Date(fixture.eval_at) });
+    console.error(`[eval] ${fixture.id} × ${repeats} via ${inference.model_id}`);
     for (let i = 0; i < repeats; i++) {
-      const raw = await stubInference.infer({
+      const raw = await inference.infer({
         session_id: fixture.session_id,
         pass_index: fixture.pass_index,
         prompt_version: promptVersion,
@@ -58,7 +61,7 @@ export async function run(): Promise<string> {
 
   const report = renderReport({
     prompt_version: promptVersion,
-    model_id: stubInference.model_id,
+    model_id: inference.model_id,
     repeats,
     scores,
   });

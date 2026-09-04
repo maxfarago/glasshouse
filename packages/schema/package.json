@@ -2,7 +2,8 @@
   "name": "@glasshouse/schema",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./hash": "./src/hash.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

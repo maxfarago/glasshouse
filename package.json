@@ -7,8 +7,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "eval": "pnpm --filter @glasshouse/evals start",
+    "dev": "pnpm --filter @glasshouse/web dev & pnpm --filter @glasshouse/worker dev; wait",
+    "eval": "pnpm --filter @glasshouse/evals exec tsx src/cli.ts",
+    "eval:p1": "pnpm --filter @glasshouse/evals exec tsx src/cli.ts --prompt p1",
     "test": "pnpm --filter @glasshouse/schema test && pnpm --filter @glasshouse/signals test",
     "typecheck": "pnpm -r typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd"]
   }
 }

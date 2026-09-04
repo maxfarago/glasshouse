@@ -1,12 +1,6 @@
 import { randomUUID } from "node:crypto";
-import {
-  hashSignalSet,
-  type Claim,
-  type ClaimType,
-  type Declined,
-  type Portrait,
-  type SignalSet,
-} from "@glasshouse/schema";
+import type { Claim, ClaimType, Declined, Portrait, SignalSet } from "@glasshouse/schema";
+import { hashSignalSet } from "@glasshouse/schema/hash";
 import type { InferInput, Inference } from "./types.ts";
 
 const MODEL_ID = "stub-v0";

@@ -1,4 +1,11 @@
 packages:
   - "packages/*"
   - "services/*"
+  - "apps/*"
   - "evals/harness"
+
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
+  - '@cloudflare/workerd-darwin-arm64'
+
