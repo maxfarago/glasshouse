@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveInference } from "@glasshouse/inference";
-import { validatePortrait, type Drop, type Portrait } from "@glasshouse/schema";
+import { stripWithheld, validatePortrait, type Drop, type Portrait } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
 import { clipToTiers, loadFixtures } from "./load.ts";
 import { renderReport } from "./report.ts";
@@ -32,7 +32,7 @@ export async function run(): Promise<string> {
     const portraits: Portrait[] = [];
     const dropsPerRun: Drop[][] = [];
     const clipped = clipToTiers(fixture.signals, fixture.tiers_available);
-    const signals = derive(clipped, { now: new Date(fixture.eval_at) });
+    const signals = stripWithheld(derive(clipped, { now: new Date(fixture.eval_at) }));
     console.error(`[eval] ${fixture.id} × ${repeats} via ${inference.model_id}`);
     for (let i = 0; i < repeats; i++) {
       const raw = await inference.infer({

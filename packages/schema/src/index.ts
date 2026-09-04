@@ -8,6 +8,11 @@ export {
 export { asSignalSet } from "./parse.ts";
 export { hitsProhibited } from "./prohibited.ts";
 export {
+  WITHHELD_SIGNAL_IDS,
+  isWithheldSignalId,
+  stripWithheld,
+} from "./withheld.ts";
+export {
   claimSchema,
   claimTypeSchema,
   confidenceSchema,

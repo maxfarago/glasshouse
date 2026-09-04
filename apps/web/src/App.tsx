@@ -1,11 +1,11 @@
-import { SIGNAL_REGISTRY, sourceOf, type Portrait, type SignalId, type SignalSet } from "@glasshouse/schema";
+import { isWithheldSignalId, SIGNAL_REGISTRY, sourceOf, stripWithheld, type Portrait, type SignalId, type SignalSet } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collectBrowserT2, collectT1Now } from "./collect.ts";
 import { readSse } from "./sse.ts";
 
 type Src = "EDGE" | "CLIENT" | "TLS" | "YOU" | "DERIVED";
-type Row = { id: string; at: number; src: Src; key: string; value: string };
+type Row = { id: string; at: number; src: Src; key: string; value: string; withheld: boolean };
 
 const START = performance.now();
 
@@ -36,6 +36,7 @@ function rowsFrom(signals: SignalSet, seen: Set<string>): Row[] {
       src: srcOf(key),
       key,
       value: fmt(value),
+      withheld: isWithheldSignalId(key),
     });
   }
   return out;
@@ -87,7 +88,7 @@ export function App() {
         prompt_version: "p1",
         tiers_available: ["T0", "T1", "T2"],
         behavior_sparse: false,
-        signals: signalsRef.current,
+        signals: stripWithheld(signalsRef.current),
         sampling: "live",
       };
       setStatus("inferring");
@@ -142,13 +143,18 @@ export function App() {
         {rows.map((row) => (
           <div
             key={row.id}
-            className={`row ${row.src === "DERIVED" ? "derived" : ""} ${hl === row.id ? "hl" : ""}`}
+            className={`row ${row.src === "DERIVED" ? "derived" : ""} ${row.withheld ? "withheld" : ""} ${hl === row.id ? "hl" : ""}`}
           >
             <div className="t">+{row.at}ms</div>
             <div className={`src ${row.src}`}>{row.src}</div>
             <div className="body">
               <span className="k">{row.key}</span>
               {row.value}
+              {row.withheld ? (
+                <div className="withheld-why">
+                  collected, shown to you, withheld from the model — accessibility-adjacent
+                </div>
+              ) : null}
             </div>
           </div>
         ))}

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { stripWithheld, type ModelOutput, type Portrait } from "@glasshouse/schema";
 import { hashSignalSet } from "@glasshouse/schema/hash";
-import type { ModelOutput, Portrait } from "@glasshouse/schema";
 import type { InferInput } from "./types.ts";
 
 export function assemblePortrait(input: InferInput, output: ModelOutput, modelId: string): Portrait {
@@ -11,7 +11,7 @@ export function assemblePortrait(input: InferInput, output: ModelOutput, modelId
     prompt_version: input.prompt_version,
     model_id: modelId,
     sampling: input.sampling,
-    signal_set_hash: hashSignalSet(input.signals),
+    signal_set_hash: hashSignalSet(stripWithheld(input.signals)),
     tiers_available: input.tiers_available,
     claims: output.claims.map((c) => ({ ...c, claim_id: randomUUID() })),
     declined: output.declined,

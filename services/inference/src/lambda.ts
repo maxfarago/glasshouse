@@ -4,7 +4,7 @@ import { loadPrompt } from "./prompt.ts";
 import { anthropicKey } from "./secret.ts";
 import { deleteSession, putSession } from "./sessions.ts";
 import type { InferInput } from "./types.ts";
-import { validatePortrait } from "@glasshouse/schema";
+import { stripWithheld, validatePortrait } from "@glasshouse/schema";
 
 type LambdaEvent = {
   body?: string | null;
@@ -53,18 +53,19 @@ function routeOf(event: LambdaEvent): { method: string; path: string } {
 }
 
 async function infer(input: InferInput, stream: ResponseStream): Promise<void> {
-  const promptVersion = input.prompt_version || "p1";
+  const clean = { ...input, signals: stripWithheld(input.signals) };
+  const promptVersion = clean.prompt_version || "p1";
   const repoRoot = process.env.LAMBDA_TASK_ROOT ?? process.cwd();
   const system = await loadPrompt(promptVersion, repoRoot);
   const apiKey = await anthropicKey();
   const inference = createAnthropicInference({ system, apiKey });
   if (!inference.stream) throw new Error("anthropic inference missing stream()");
-  for await (const ev of inference.stream(input)) {
+  for await (const ev of inference.stream(clean)) {
     if (ev.type === "thinking") sse(stream, "thinking", { text: ev.text });
     if (ev.type === "portrait") {
-      const portrait = assemblePortrait(input, ev.output, inference.model_id);
-      const { portrait: clean, drops } = validatePortrait(portrait);
-      sse(stream, "pass_complete", { portrait: clean, drops });
+      const portrait = assemblePortrait(clean, ev.output, inference.model_id);
+      const { portrait: validated, drops } = validatePortrait(portrait);
+      sse(stream, "pass_complete", { portrait: validated, drops });
     }
   }
 }

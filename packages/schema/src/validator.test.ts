@@ -63,6 +63,21 @@ describe("validatePortrait", () => {
     assert.equal(out.claims.length, 1);
   });
 
+  it("drops withheld evidence pointers", () => {
+    const { portrait: out, drops } = validatePortrait(
+      portrait([
+        {
+          claim_type: "os_browser_posture",
+          statement: "reduced motion is on",
+          evidence: ["sig.client.prefers_reduced_motion"],
+        },
+      ]),
+    );
+    assert.equal(out.claims.length, 0);
+    assert.equal(drops[0]?.reason, "non_citable_evidence");
+    assert.equal(drops[0]?.detail, "sig.client.prefers_reduced_motion");
+  });
+
   it("drops prohibited attributes", () => {
     const { drops } = validatePortrait(
       portrait([

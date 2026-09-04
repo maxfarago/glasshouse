@@ -69,6 +69,13 @@ body {
 .row .src.DERIVED { color: var(--derived); }
 .row .body .k { color: var(--mute); margin-right: 0.4rem; }
 .row.hl { background: #1d1a14; }
+.row.withheld .body { color: var(--mute); }
+.row .withheld-why {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--mute);
+  font-style: italic;
+}
 
 .side {
   display: grid;

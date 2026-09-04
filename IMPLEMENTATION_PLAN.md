@@ -18,7 +18,10 @@ and grading itself.
 Four invariants. Violating any of these breaks the argument, not just the code.
 
 1. **Deterministic before speculative.** No claim may reference a signal the visitor has
-   not already watched arrive in the ledger. The ledger is the LLM's entire input.
+   not already watched arrive in the ledger. The model input is that ledger minus a named
+   **withheld** set (accessibility-adjacent signals: shown in the ledger, stripped from
+   the infer payload, two hashes). A withheld ID in `evidence` is a validator drop,
+   fail-closed — not a prompt instruction. See `GLASSHOUSE_V02_PLAN.md`.
 2. **Every claim is falsifiable and attributed.** A claim carries an evidence pointer to
    specific signal IDs and a stated falsifier. Unattributable claims are dropped by a
    validator, not discouraged by the prompt. This is the anti-Barnum mechanism.
@@ -544,8 +547,9 @@ EC2, Go probe, DNS-01 certs, grey-clouded `tls.maxfarago.com`, T3 join. Isolated
 design — Phases 0–3 produce a live ledger and portrait with T3 absent.
 
 **Phase 5 — Calibration + empty state.** Isolated calibration Lambda and role, thumbs
-wired through the Worker with the calibration identity, empty-state screen and copy,
-`p2` prompt tuned against the sparse fixtures.
+wired through the Worker with the calibration identity, empty-state screen and copy.
+`p2` (sparse-fixture / scarcity-as-finding) is specified in `GLASSHOUSE_V02_PLAN.md` and
+can land before calibration UI.
 
 Phases 0–1 before any UI is the load-bearing ordering decision. It is also the ordering that
 lets you throw away prompt `p1` cheaply.

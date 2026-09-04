@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { modelOutputSchema, type ModelOutput } from "@glasshouse/schema";
+import { modelOutputSchema, stripWithheld, type ModelOutput } from "@glasshouse/schema";
 import { assemblePortrait } from "./assemble.ts";
 import type { InferEvent, InferInput, Inference } from "./types.ts";
 
@@ -63,7 +63,7 @@ function userMessage(input: InferInput): string {
     `sampling: ${input.sampling}`,
     "",
     "signal set (raw + derived):",
-    JSON.stringify(input.signals, null, 2),
+    JSON.stringify(stripWithheld(input.signals), null, 2),
   ].join("\n");
 }
 
