@@ -10,7 +10,7 @@ SECRET  := glasshouse/anthropic
 ZIP     := build/gh-inference.zip
 ROOT    := $(abspath ..)
 
-.PHONY: whoami package secret role function url table worker-user config deploy
+.PHONY: whoami package secret role function url table worker-user config deploy worker-secrets worker-deploy
 
 whoami:
 	aws sts get-caller-identity --region $(AWS_REGION)
@@ -80,3 +80,10 @@ worker-user:
 
 deploy: whoami secret role table function config url
 	@echo "deployed $(FN)"
+
+worker-secrets:
+	node push-worker-secrets.mjs
+
+worker-deploy:
+	cd $(ROOT) && pnpm --filter @glasshouse/web build
+	cd $(ROOT)/apps/worker && pnpm exec wrangler deploy

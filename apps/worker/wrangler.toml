@@ -1,6 +1,13 @@
 name = "glasshouse"
 main = "src/index.ts"
 compatibility_date = "2026-09-04"
+account_id = "c7698f65669d1881d1f02fd4bcbc250a"
+workers_dev = true
+
+[assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 [vars]
 AWS_REGION = "us-east-1"

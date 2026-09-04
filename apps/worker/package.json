@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8787",
+    "deploy": "pnpm --filter @glasshouse/web build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
