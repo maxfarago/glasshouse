@@ -94,6 +94,14 @@ function buildClaims(signals: SignalSet): { claims: Claim[]; declined: Declined[
         "datacenter geo is cheap to spoof; do not treat it as presence.",
         "a gps sample or a residential asn in-country",
       ),
+      claim(
+        "network_evasion",
+        "LIKELY",
+        "mullvad vpn: the us city is an exit; timezone and language are dutch and walked past it",
+        ["sig.edge.as_org", "sig.derived.asn_type", "sig.client.timezone"],
+        "datacenter asn plus geo/timezone split is a deliberate tunnel, not missing data.",
+        "a residential asn whose country matches the timezone",
+      ),
     );
   } else if (city || country) {
     const where = city ? `${city}, ${country ?? "unknown country"}` : (country ?? "unknown");
@@ -266,6 +274,29 @@ function buildClaims(signals: SignalSet): { claims: Claim[]; declined: Declined[
       reason: "stub leaves sophistication to a real model",
     });
   }
+  if (!claims.some((c) => c.claim_type === "network_evasion")) {
+    if (asOrg && /private relay/i.test(asOrg)) {
+      claims.push(
+        claim(
+          "network_evasion",
+          "LIKELY",
+          "icloud private relay: the edge country is an apple egress, not a presence",
+          ["sig.edge.as_org", "sig.derived.asn_type"],
+          "relay is a chosen network defense; client signals that remain are what it failed to hide.",
+          "a residential or mobile carrier asn",
+        ),
+      );
+    } else {
+      declined.push({
+        claim_type: "network_evasion",
+        reason: "no vpn, relay, or datacenter contradiction",
+      });
+    }
+  }
+  declined.push({
+    claim_type: "installed_software",
+    reason: "no protocol-handler or font-probe hits in this signal set",
+  });
 
   const present = Object.values(signals).filter((v) => v != null && v !== "").length;
   const thin =

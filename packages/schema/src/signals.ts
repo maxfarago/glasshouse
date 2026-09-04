@@ -34,12 +34,39 @@ export const SIGNAL_REGISTRY = {
   "sig.client.css.inverted_colors": "T1",
   "sig.client.css.prefers_contrast": "T1",
   "sig.client.css.prefers_reduced_transparency": "T1",
+  "sig.client.css.prefers_reduced_data": "T1",
+  "sig.client.css.pointer": "T1",
+  "sig.client.css.any_pointer": "T1",
+  "sig.client.css.hover": "T1",
+  "sig.client.css.any_hover": "T1",
+  "sig.client.css.dynamic_range": "T1",
+  "sig.client.css.video_dynamic_range": "T1",
+  "sig.client.css.color_gamut": "T1",
+  "sig.client.css.display_mode": "T1",
+  "sig.client.css.scripting": "T1",
+  "sig.client.css.update": "T1",
+  "sig.client.css.orientation": "T1",
   "sig.client.canvas_hash": "T2",
   "sig.client.webgl_vendor": "T2",
   "sig.client.webgl_renderer": "T2",
+  "sig.client.webgl.ext_hash": "T2",
+  "sig.client.webgl.max_texture": "T2",
+  "sig.client.webgl.precision": "T2",
+  "sig.client.webgl2_available": "T2",
   "sig.client.fonts.count": "T2",
   "sig.client.fonts.notable": "T2",
+  "sig.client.fonts.probe_hits": "T2",
   "sig.client.audio_hash": "T2",
+  "sig.client.intl.calendar": "T2",
+  "sig.client.intl.numbering": "T2",
+  "sig.client.intl.first_day": "T2",
+  "sig.client.intl.weekend": "T2",
+  "sig.client.intl.tz_count": "T2",
+  "sig.client.devices.kinds": "T2",
+  "sig.client.netinfo.effective_type": "T2",
+  "sig.client.netinfo.rtt": "T2",
+  "sig.client.netinfo.downlink": "T2",
+  "sig.client.netinfo.save_data": "T2",
   "sig.tls.ja4": "T3",
   "sig.tls.alpn": "T3",
   "sig.behav.pointer_jitter": "T4",
@@ -52,6 +79,7 @@ export const SIGNAL_REGISTRY = {
   "sig.derived.asn_type": "derived",
   "sig.derived.local_time": "derived",
   "sig.derived.privacy_posture": "derived",
+  "sig.derived.net_vs_tz": "derived",
 } as const satisfies Record<string, SignalSource>;
 
 export type SignalId = keyof typeof SIGNAL_REGISTRY;
@@ -72,6 +100,7 @@ export type SignalValue =
   | boolean
   | null
   | string[]
+  | number[]
   | { w: number; h: number }
   | { lat: number; lon: number }
   | { timezone: string; weekday: string; hour: number; iso: string }

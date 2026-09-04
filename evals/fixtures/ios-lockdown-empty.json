@@ -45,6 +45,7 @@
     "os_browser_posture": { "accept": ["ios", "safari"] },
     "privacy_posture": { "accept": ["hardening", "empty", "generic"] },
     "connection_context": { "accept": ["datacenter", "relay", "private"] },
+    "network_evasion": { "accept": ["relay", "icloud", "private"] },
     "language_profile": { "accept": ["en"] }
   }
 }

@@ -2,6 +2,7 @@ import type { SignalSet } from "@glasshouse/schema";
 import { asnType } from "./asn-type.ts";
 import { deviceFamily, type Screen } from "./device-family.ts";
 import { localTime } from "./local-time.ts";
+import { netVsTz } from "./net-vs-tz.ts";
 import { privacyPosture } from "./privacy.ts";
 
 export type DeriveClock = { now: Date };
@@ -43,12 +44,20 @@ export function derive(signals: SignalSet, clock: DeriveClock): SignalSet {
   const asn = asnType(asString(signals["sig.edge.as_org"]));
   const time = localTime(asString(signals["sig.client.timezone"]), clock.now);
   const posture = privacyPosture(PRIVACY_KEYS.map((k) => signals[k]));
+  const net = netVsTz({
+    timezone: asString(signals["sig.client.timezone"]),
+    country: asString(signals["sig.edge.geo.country"]),
+    city: asString(signals["sig.edge.geo.city"]),
+    asnType: asn,
+  });
 
-  return {
+  const out: SignalSet = {
     ...signals,
     "sig.derived.device_family": family,
     "sig.derived.asn_type": asn,
-    "sig.derived.local_time": time,
     "sig.derived.privacy_posture": posture,
   };
+  if (time) out["sig.derived.local_time"] = time;
+  if (net) out["sig.derived.net_vs_tz"] = net;
+  return out;
 }

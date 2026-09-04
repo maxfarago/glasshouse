@@ -10,6 +10,7 @@
     "dev": "pnpm --filter @glasshouse/web dev & pnpm --filter @glasshouse/worker dev; wait",
     "eval": "pnpm --filter @glasshouse/evals exec tsx src/cli.ts",
     "eval:p1": "pnpm --filter @glasshouse/evals exec tsx src/cli.ts --prompt p1",
+    "eval:p2": "pnpm --filter @glasshouse/evals exec tsx src/cli.ts --prompt p2 --repeats 3",
     "test": "pnpm --filter @glasshouse/schema test && pnpm --filter @glasshouse/signals test",
     "typecheck": "pnpm -r typecheck",
     "deploy:worker": "pnpm --filter @glasshouse/web build && pnpm --filter @glasshouse/worker exec wrangler deploy"

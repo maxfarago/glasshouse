@@ -14,6 +14,8 @@ export const CLAIM_TYPES = [
   "employment_sector",
   "employer_or_org",
   "visit_intent",
+  "network_evasion",
+  "installed_software",
 ] as const;
 
 export type ClaimType = (typeof CLAIM_TYPES)[number];
