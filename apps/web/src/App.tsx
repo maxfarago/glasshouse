@@ -85,7 +85,7 @@ export function App() {
       const body = {
         session_id: id,
         pass_index: 1,
-        prompt_version: "p1",
+        prompt_version: "p2",
         tiers_available: ["T0", "T1", "T2"],
         behavior_sparse: false,
         signals: stripWithheld(signalsRef.current),
