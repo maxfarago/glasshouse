@@ -1,0 +1,14 @@
+{
+  "name": "glasshouse",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "eval": "pnpm --filter @glasshouse/evals start",
+    "test": "pnpm --filter @glasshouse/schema test && pnpm --filter @glasshouse/signals test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

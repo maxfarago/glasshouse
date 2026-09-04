@@ -1,0 +1,11 @@
+---
+description: Git push and AWS account constraints
+alwaysApply: true
+---
+
+# Operating constraints
+
+- Default branch is `master`. Never create or switch this repo to `main`.
+- Never `git push` to `master`. Only the operator pushes.
+- Before any AWS provisioning or AWS CLI against this project, run `aws-ha` (selects the correct local profile and prints S3 buckets). Use that profile for all subsequent AWS calls. Do not use the default profile.
+- `evals/fixtures/` is sanitized and committed. Real captures live in gitignored `evals/fixtures.local/`. The harness prefers local when present.
