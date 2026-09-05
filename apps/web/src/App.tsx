@@ -8,6 +8,12 @@ type Src = "EDGE" | "CLIENT" | "TLS" | "YOU" | "DERIVED";
 type Row = { id: string; at: number; src: Src; key: string; value: string; withheld: boolean };
 
 const START = performance.now();
+const THINK_TAIL = 40;
+
+function tailLines(text: string, n: number): string {
+  const lines = text.split("\n");
+  return lines.length <= n ? text : lines.slice(-n).join("\n");
+}
 
 function srcOf(id: string): Src {
   if (id.startsWith("sig.derived.")) return "DERIVED";
@@ -51,6 +57,7 @@ export function App() {
   const [status, setStatus] = useState("bootstrapping");
   const seen = useRef(new Set<string>());
   const signalsRef = useRef<SignalSet>({});
+  const thinkRef = useRef<HTMLDivElement>(null);
 
   const append = (next: SignalSet) => {
     signalsRef.current = { ...signalsRef.current, ...next };
@@ -121,6 +128,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const el = thinkRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [thinking]);
+
+  useEffect(() => {
     if (!sid) return;
     const onHide = () => {
       navigator.sendBeacon("/api/session/delete", JSON.stringify({ sid }));
@@ -160,9 +172,11 @@ export function App() {
         ))}
       </section>
       <aside className="side">
-        <div className="panel">
+        <div className="panel think-panel">
           <h2>deliberation</h2>
-          <div className="think">{thinking || "waiting for the model to start talking…"}</div>
+          <div className="think" ref={thinkRef}>
+            {thinking ? tailLines(thinking, THINK_TAIL) : "waiting for the model to start talking…"}
+          </div>
         </div>
         <div className="panel" data-section="portrait">
           <h2>portrait</h2>

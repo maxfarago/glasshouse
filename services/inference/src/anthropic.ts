@@ -4,7 +4,7 @@ import { assemblePortrait } from "./assemble.ts";
 import type { InferEvent, InferInput, Inference } from "./types.ts";
 
 export const DEFAULT_MODEL = "claude-sonnet-4-6";
-const THINKING_BUDGET = 8192;
+const THINKING_BUDGET = 2048;
 const MAX_TOKENS = 16000;
 
 const SUBMIT_TOOL: Anthropic.Messages.Tool = {

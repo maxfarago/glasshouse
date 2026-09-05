@@ -79,13 +79,19 @@ body {
 
 .side {
   display: grid;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(10rem, 1fr) minmax(12rem, 1.15fr);
   min-height: 0;
 }
 .panel {
   overflow: auto;
   padding: 1rem 1.15rem 1.5rem;
   min-height: 0;
+}
+.think-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0.75rem;
 }
 .panel + .panel { border-top: 1px solid var(--rule); }
 .panel h2 {
@@ -98,6 +104,9 @@ body {
 }
 
 .think {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 0.74rem;
   white-space: pre-wrap;

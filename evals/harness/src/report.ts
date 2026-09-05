@@ -65,6 +65,10 @@ export function renderReport(args: {
     labeledBrier.length === 0
       ? "—"
       : (labeledBrier.reduce((a, b) => a + b, 0) / labeledBrier.length).toFixed(2);
+  const meanDrop =
+    args.scores.length === 0
+      ? "—"
+      : (args.scores.reduce((a, s) => a + s.drop_rate, 0) / args.scores.length).toFixed(2);
   return [
     `# ${args.prompt_version}`,
     "",
@@ -72,6 +76,7 @@ export function renderReport(args: {
     `repeats: ${args.repeats}`,
     `fixtures: ${args.scores.length}`,
     `mean_brier: ${meanBrier}`,
+    `mean_drop_rate: ${meanDrop}`,
     "",
     "## summary",
     "",
