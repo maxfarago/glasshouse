@@ -10,6 +10,7 @@
   "dependencies": {
     "@glasshouse/schema": "workspace:*",
     "@glasshouse/signals": "workspace:*",
+    "@glasshouse/tells": "workspace:*",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

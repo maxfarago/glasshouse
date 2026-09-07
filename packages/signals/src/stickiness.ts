@@ -23,8 +23,7 @@ export type Stickiness = {
 };
 
 function volatileRegion(input: StickinessInput): Set<string> | null {
-  const cityMissing = input.city == null || input.city === "";
-  if (input.asnType === "datacenter" && cityMissing) return null;
+  if (input.asnType === "datacenter") return null;
   const cc = input.country?.toUpperCase() ?? null;
   return cc ? new Set([cc]) : null;
 }

@@ -1,5 +1,6 @@
-import { isWithheldSignalId, SIGNAL_REGISTRY, sourceOf, stripForInfer, type Portrait, type SignalId, type SignalSet } from "@glasshouse/schema";
+import { isWithheldSignalId, SIGNAL_REGISTRY, sourceOf, stripForInfer, type SignalId, type SignalSet } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
+import { detectTells } from "@glasshouse/tells";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collectBrowserT2, collectT1Now } from "./collect.ts";
 import { readSse } from "./sse.ts";
@@ -9,6 +10,7 @@ type Row = { id: string; at: number; src: Src; key: string; value: string; withh
 
 const START = performance.now();
 const THINK_TAIL = 40;
+const INFER = false;
 
 function tailLines(text: string, n: number): string {
   const lines = text.split("\n");
@@ -38,14 +40,13 @@ function fmt(key: string, value: unknown, signals: SignalSet = {}): string {
   return JSON.stringify(value);
 }
 
-function rowsFrom(signals: SignalSet, seen: Set<string>): Row[] {
+function rowsFrom(signals: SignalSet, firstAt: Map<string, number>): Row[] {
   const out: Row[] = [];
   for (const [key, value] of Object.entries(signals)) {
-    if (seen.has(key)) continue;
-    seen.add(key);
+    if (!firstAt.has(key)) firstAt.set(key, Math.round(performance.now() - START));
     out.push({
       id: key,
-      at: Math.round(performance.now() - START),
+      at: firstAt.get(key) ?? 0,
       src: srcOf(key),
       key,
       value: fmt(key, value, signals),
@@ -57,40 +58,28 @@ function rowsFrom(signals: SignalSet, seen: Set<string>): Row[] {
 
 export function App() {
   const [sid, setSid] = useState<string | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [signals, setSignals] = useState<SignalSet>({});
   const [hl, setHl] = useState<string | null>(null);
   const [thinking, setThinking] = useState("");
-  const [portrait, setPortrait] = useState<Portrait | null>(null);
   const [status, setStatus] = useState("bootstrapping");
-  const seen = useRef(new Set<string>());
-  const signalsRef = useRef<SignalSet>({});
+  const firstAt = useRef(new Map<string, number>());
+  const signalsRef = useRef(signals);
+  signalsRef.current = signals;
   const thinkRef = useRef<HTMLDivElement>(null);
 
+  const derived = useMemo(() => derive(signals, { now: new Date() }), [signals]);
+  const tells = useMemo(() => detectTells(derived), [derived]);
+  const rows = useMemo(() => rowsFrom(derived, firstAt.current), [derived]);
+
   const append = (next: SignalSet) => {
-    signalsRef.current = { ...signalsRef.current, ...next };
-    const derived = derive(signalsRef.current, { now: new Date() });
-    signalsRef.current = derived;
-    setRows((r) => {
-      const extra = rowsFrom(derived, seen.current);
-      const merged = extra.length ? [...r, ...extra] : r;
-      return merged.map((row) => {
-        if (!row.key.startsWith("sig.derived.")) return row;
-        const v = derived[row.key as SignalId];
-        if (v === undefined) return row;
-        const value = fmt(row.key, v);
-        if (value === row.value) return row;
-        return { ...row, value };
-      });
-    });
+    setSignals((prev) => ({ ...prev, ...next }));
   };
 
   useEffect(() => {
     const ac = new AbortController();
-    seen.current = new Set();
-    signalsRef.current = {};
-    setRows([]);
+    firstAt.current = new Map();
+    setSignals({});
     setThinking("");
-    setPortrait(null);
     (async () => {
       setStatus("edge");
       const boot = await fetch("/api/bootstrap", { signal: ac.signal });
@@ -104,6 +93,10 @@ export function App() {
       append(collectT1Now());
       setStatus("client fingerprint");
       append(await collectBrowserT2());
+      if (!INFER) {
+        setStatus("tells");
+        return;
+      }
       setStatus("waiting for settle");
       await new Promise((r) => setTimeout(r, 800));
       const body = {
@@ -112,7 +105,7 @@ export function App() {
         prompt_version: "p3",
         tiers_available: ["T0", "T1", "T2"],
         behavior_sparse: false,
-        signals: stripForInfer(signalsRef.current),
+        signals: stripForInfer(derive(signalsRef.current, { now: new Date() })),
         sampling: "live",
       };
       setStatus("inferring");
@@ -131,7 +124,6 @@ export function App() {
           setThinking((t) => t + String((ev.data as { text: string }).text));
         }
         if (ev.event === "pass_complete" && ev.data && typeof ev.data === "object" && "portrait" in ev.data) {
-          setPortrait((ev.data as { portrait: Portrait }).portrait);
           setStatus("pass 1");
         }
         if (ev.event === "error") {
@@ -167,6 +159,7 @@ export function App() {
           <h1>glasshouse</h1>
           <div className="meta">
             {sid ? sid.slice(0, 8) : "—"} · {clock} · {status}
+            {rows.length ? ` · ${tells.length} tells from ${rows.length} signals collected` : ""}
           </div>
         </div>
         {rows.map((row) => (
@@ -192,21 +185,23 @@ export function App() {
         <div className="panel think-panel">
           <h2>deliberation</h2>
           <div className="think" ref={thinkRef}>
-            {thinking ? tailLines(thinking, THINK_TAIL) : "waiting for the model to start talking…"}
+            {INFER
+              ? thinking
+                ? tailLines(thinking, THINK_TAIL)
+                : "waiting for the model to start talking…"
+              : "inference is off. tells are computed, not generated."}
           </div>
         </div>
-        <div className="panel" data-section="portrait">
-          <h2>portrait</h2>
-          {portrait?.thin_signal_note ? <p className="note">{portrait.thin_signal_note}</p> : null}
-          {!portrait ? <p className="status">ledger fills first. claims arrive after.</p> : null}
-          {portrait?.claims.map((c) => (
-            <article key={c.claim_id} className="card">
-              <div className="tier">{c.confidence}</div>
-              <p className="stmt">{c.statement}</p>
-              <p className="why">{c.reasoning}</p>
-              <p className="kill">falsifier: {c.falsifier}</p>
+        <div className="panel" data-section="tells">
+          <h2>tells</h2>
+          {tells.length === 0 ? <p className="status">ledger fills first. tells arrive as collectors finish.</p> : null}
+          {tells.map((t) => (
+            <article key={t.id} className="card">
+              <div className={`tier cat-${t.category}`}>{t.category}</div>
+              <p className="stmt">{t.headline}</p>
+              <p className="why">{t.detail}</p>
               <div className="chips">
-                {c.evidence.map((e) => (
+                {t.evidence.map((e) => (
                   <span
                     key={e}
                     className="chip"

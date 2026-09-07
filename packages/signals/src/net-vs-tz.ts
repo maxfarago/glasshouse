@@ -10,9 +10,7 @@ export function netVsTz(input: {
   asnType: AsnType;
 }): NetVsTz | null {
   if (!input.timezone) return null;
-
-  const cityMissing = input.city == null || input.city === "";
-  if (input.asnType === "datacenter" && cityMissing) return "geo_absent";
+  if (input.asnType === "datacenter") return "geo_absent";
 
   const countries = TZ_COUNTRIES[input.timezone];
   if (!countries) return null;

@@ -103,6 +103,22 @@ function asSet(codes: string[]): Set<string> {
   return new Set(codes);
 }
 
+export function weekStartName(day: number | null): string | null {
+  if (day === 7) return "Sunday";
+  if (day === 6) return "Saturday";
+  if (day === 1) return "Monday";
+  if (day == null) return null;
+  return `day ${day}`;
+}
+
+export function weekStartForCountry(cc: string | null): string | null {
+  if (!cc) return null;
+  const up = cc.toUpperCase();
+  if (SUNDAY_FIRST.includes(up)) return "Sunday";
+  if (SATURDAY_FIRST.includes(up)) return "Saturday";
+  return "Monday";
+}
+
 export function timezoneCountries(tz: string | null): Set<string> | null {
   if (!tz) return null;
   const codes = TZ_COUNTRIES[tz];

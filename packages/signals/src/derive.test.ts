@@ -38,7 +38,7 @@ describe("derive", () => {
     assert.equal(time.hour, 14);
   });
 
-  it("marks mullvad us-exit vs amsterdam tz as contradict", () => {
+  it("does not treat a datacenter city as a region", () => {
     const out = derive(
       {
         "sig.edge.as_org": "Mullvad VPN",
@@ -48,7 +48,9 @@ describe("derive", () => {
       },
       { now: new Date("2026-09-04T12:00:00Z") },
     );
-    assert.equal(out["sig.derived.net_vs_tz"], "contradict");
+    assert.equal(out["sig.derived.net_vs_tz"], "geo_absent");
+    assert.equal(out["sig.derived.agree.volatile_fast"], "indeterminate");
+    assert.equal(out["sig.derived.agree.volatile_install"], "indeterminate");
   });
 
   it("marks residential amsterdam as agree", () => {

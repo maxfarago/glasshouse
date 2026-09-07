@@ -79,7 +79,7 @@ body {
 
 .side {
   display: grid;
-  grid-template-rows: minmax(10rem, 1fr) minmax(12rem, 1.15fr);
+  grid-template-rows: minmax(5rem, 0.4fr) minmax(14rem, 1.6fr);
   min-height: 0;
 }
 .panel {
@@ -120,12 +120,10 @@ body {
   padding: 0.7rem 0.8rem 0.8rem;
   margin-bottom: 0.65rem;
 }
-.card .tier {
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--good);
-}
+.card .tier.cat-contradictory { color: var(--bad); }
+.card .tier.cat-rare { color: var(--you); }
+.card .tier.cat-mapped { color: var(--client); }
+.card .tier.cat-withheld { color: var(--mute); }
 .card .stmt { margin: 0.25rem 0 0.45rem; }
 .card .why, .card .kill { color: var(--mute); font-size: 0.78rem; margin: 0.15rem 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
