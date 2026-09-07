@@ -9,8 +9,11 @@ export { asSignalSet } from "./parse.ts";
 export { hitsProhibited } from "./prohibited.ts";
 export {
   WITHHELD_SIGNAL_IDS,
+  INFER_OMIT_SIGNAL_IDS,
   isWithheldSignalId,
+  isNonCitableSignalId,
   stripWithheld,
+  stripForInfer,
 } from "./withheld.ts";
 export {
   claimSchema,

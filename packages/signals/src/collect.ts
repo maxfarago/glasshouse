@@ -103,12 +103,23 @@ function collectCss(mm: T1Host["matchMedia"]): SignalSet {
   };
 }
 
+const MEMORY_STEPS = [0.25, 0.5, 1, 2, 4, 8] as const;
+
+function clampDeviceMemory(value: number | undefined): { value: number | null; capped: boolean | null } {
+  if (value == null || Number.isNaN(value)) return { value: null, capped: null };
+  if (value >= 8) return { value: 8, capped: true };
+  if ((MEMORY_STEPS as readonly number[]).includes(value)) return { value, capped: false };
+  return { value: 8, capped: true };
+}
+
 export function collectT1(host: T1Host): SignalSet {
+  const mem = clampDeviceMemory(host.deviceMemory);
   return {
     "sig.client.screen": { w: host.screen.width, h: host.screen.height },
     "sig.client.dpr": host.devicePixelRatio,
     "sig.client.hw_concurrency": host.hardwareConcurrency ?? null,
-    "sig.client.device_memory": host.deviceMemory ?? null,
+    "sig.client.device_memory": mem.value,
+    "sig.client.device_memory_capped": mem.capped,
     "sig.client.max_touch": host.maxTouchPoints ?? 0,
     "sig.client.langs": host.languages ? [...host.languages] : null,
     "sig.client.timezone": host.timeZone ?? null,
@@ -137,6 +148,9 @@ export type T2Host = {
     numbering: string | null;
     firstDay: number | null;
     weekend: number[] | null;
+    hourCycle: string | null;
+    measurement: string | null;
+    direction: string | null;
     tzCount: number | null;
   };
   devices: () => string[] | null;
@@ -169,6 +183,9 @@ export function collectT2(host: T2Host): SignalSet {
     "sig.client.intl.numbering": intl.numbering,
     "sig.client.intl.first_day": intl.firstDay,
     "sig.client.intl.weekend": intl.weekend,
+    "sig.client.intl.hour_cycle": intl.hourCycle,
+    "sig.client.intl.measurement": intl.measurement,
+    "sig.client.intl.direction": intl.direction,
     "sig.client.intl.tz_count": intl.tzCount,
     "sig.client.devices.kinds": host.devices(),
     "sig.client.netinfo.effective_type": net.effectiveType,

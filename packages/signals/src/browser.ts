@@ -186,17 +186,53 @@ function weekInfoOf(tag: string): WeekInfo | null {
   }
 }
 
+type TextInfo = { direction?: string };
+type LocaleExtra = {
+  getWeekInfo?: () => WeekInfo;
+  weekInfo?: WeekInfo;
+  getTextInfo?: () => TextInfo;
+  textInfo?: TextInfo;
+  getMeasurementSystems?: () => string[];
+};
+
+function textInfoOf(tag: string): string | null {
+  try {
+    const loc = new Intl.Locale(tag) as unknown as LocaleExtra;
+    const ti = typeof loc.getTextInfo === "function" ? loc.getTextInfo() : loc.textInfo;
+    return typeof ti?.direction === "string" ? ti.direction : null;
+  } catch {
+    return null;
+  }
+}
+
+function measurementOf(tag: string): string | null {
+  try {
+    const loc = new Intl.Locale(tag) as unknown as LocaleExtra;
+    const systems = typeof loc.getMeasurementSystems === "function" ? loc.getMeasurementSystems() : null;
+    const first = systems?.[0];
+    if (first === "uss" || first === "imperial") return "imperial";
+    if (first === "metric") return "metric";
+    return first ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function browserIntl(): {
   calendar: string | null;
   numbering: string | null;
   firstDay: number | null;
   weekend: number[] | null;
+  hourCycle: string | null;
+  measurement: string | null;
+  direction: string | null;
   tzCount: number | null;
 } {
   try {
     const dtf = Intl.DateTimeFormat().resolvedOptions();
     const nf = Intl.NumberFormat().resolvedOptions();
-    const wi = weekInfoOf(dtf.locale || navigator.language || "en");
+    const tag = dtf.locale || navigator.language || "en";
+    const wi = weekInfoOf(tag);
     let tzCount: number | null = null;
     try {
       tzCount = Intl.supportedValuesOf("timeZone").length;
@@ -208,10 +244,22 @@ export function browserIntl(): {
       numbering: nf.numberingSystem ?? dtf.numberingSystem ?? null,
       firstDay: wi?.firstDay ?? null,
       weekend: wi ? wi.weekend : null,
+      hourCycle: dtf.hourCycle ?? null,
+      measurement: measurementOf(tag),
+      direction: textInfoOf(tag),
       tzCount,
     };
   } catch {
-    return { calendar: null, numbering: null, firstDay: null, weekend: null, tzCount: null };
+    return {
+      calendar: null,
+      numbering: null,
+      firstDay: null,
+      weekend: null,
+      hourCycle: null,
+      measurement: null,
+      direction: null,
+      tzCount: null,
+    };
   }
 }
 

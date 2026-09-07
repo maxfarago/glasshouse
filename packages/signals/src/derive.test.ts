@@ -89,6 +89,80 @@ describe("derive", () => {
     );
     assert.equal(out["sig.derived.asn_type"], "datacenter");
     assert.equal(out["sig.derived.net_vs_tz"], "geo_absent");
+    assert.equal(out["sig.derived.agree.volatile_fast"], "indeterminate");
+  });
+
+  it("collapses sunday-first + h12 + imperial away from nl", () => {
+    const out = derive(
+      {
+        "sig.edge.as_org": "Ziggo",
+        "sig.edge.geo.country": "NL",
+        "sig.edge.geo.city": "Amsterdam",
+        "sig.client.timezone": "Europe/Amsterdam",
+        "sig.client.intl.first_day": 7,
+        "sig.client.intl.hour_cycle": "h12",
+        "sig.client.intl.measurement": "imperial",
+        "sig.client.canvas_hash": "abc",
+        "sig.client.audio_hash": "def",
+        "sig.client.fonts.count": 12,
+        "sig.client.webgl_renderer": "Apple",
+        "sig.client.fonts.probe_hits": ["SF Mono", "Calibri"],
+      },
+      { now: new Date("2026-09-04T12:00:00Z") },
+    );
+    assert.equal(out["sig.derived.agree.volatile_fast"], "agree");
+    assert.equal(out["sig.derived.agree.volatile_install"], "contradict");
+    assert.equal(out["sig.derived.agree.fast_install"], "contradict");
+    assert.equal(out["sig.derived.client_suppression"], "intact");
+    assert.deepEqual(out["sig.derived.software_implied"], ["Apple Developer Tools", "Microsoft Office"]);
+    const regions = out["sig.derived.install_regions"] as string[];
+    assert.ok(regions.includes("US"));
+    assert.ok(!regions.includes("NL"));
+  });
+
+  it("marks brave-style emptying with intact intl as suppressed", () => {
+    const out = derive(
+      {
+        "sig.edge.as_org": "Ziggo",
+        "sig.edge.geo.country": "NL",
+        "sig.client.canvas_hash": null,
+        "sig.client.audio_hash": null,
+        "sig.client.fonts.count": 0,
+        "sig.client.webgl_renderer": "Google SwiftShader",
+        "sig.client.intl.first_day": 7,
+      },
+      { now: new Date("2026-09-04T12:00:00Z") },
+    );
+    assert.equal(out["sig.derived.client_suppression"], "suppressed");
+  });
+
+  it("marks desktop on residential as path aligned and 4g as fast", () => {
+    const out = derive(
+      {
+        "sig.edge.as_org": "Ziggo",
+        "sig.client.screen": { w: 1512, h: 982 },
+        "sig.client.dpr": 2,
+        "sig.client.max_touch": 0,
+        "sig.client.netinfo.effective_type": "4g",
+      },
+      { now: new Date("2026-09-04T12:00:00Z") },
+    );
+    assert.equal(out["sig.derived.path_vs_body"], "aligned");
+    assert.equal(out["sig.derived.connection_quality"], "fast");
+  });
+
+  it("marks desktop on mobile asn as mixed", () => {
+    const out = derive(
+      {
+        "sig.edge.as_org": "KPN Mobiel",
+        "sig.client.screen": { w: 1512, h: 982 },
+        "sig.client.dpr": 2,
+        "sig.client.max_touch": 0,
+      },
+      { now: new Date("2026-09-04T12:00:00Z") },
+    );
+    assert.equal(out["sig.derived.asn_type"], "mobile");
+    assert.equal(out["sig.derived.path_vs_body"], "mixed");
   });
 });
 
@@ -97,6 +171,7 @@ describe("collectT1", () => {
     const signals = collectT1({
       screen: { width: 800, height: 600 },
       devicePixelRatio: 1,
+      deviceMemory: 32,
       maxTouchPoints: 0,
       languages: ["en"],
       timeZone: "UTC",
@@ -110,6 +185,8 @@ describe("collectT1", () => {
     });
     assert.deepEqual(signals["sig.client.screen"], { w: 800, h: 600 });
     assert.equal(signals["sig.client.prefers_reduced_motion"], false);
+    assert.equal(signals["sig.client.device_memory"], 8);
+    assert.equal(signals["sig.client.device_memory_capped"], true);
     assert.equal(signals["sig.client.css.pointer"], "fine");
     assert.equal(signals["sig.client.css.any_pointer"], "fine");
     assert.equal(signals["sig.client.css.hover"], "hover");
@@ -137,6 +214,9 @@ describe("collectT2", () => {
         numbering: "latn",
         firstDay: 1,
         weekend: [6, 7],
+        hourCycle: "h23",
+        measurement: "metric",
+        direction: "ltr",
         tzCount: 418,
       }),
       devices: () => ["audioinput", "audiooutput", "videoinput"],

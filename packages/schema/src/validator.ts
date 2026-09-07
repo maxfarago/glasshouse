@@ -3,7 +3,7 @@ import { CONFIDENCE_RANK } from "./confidence.ts";
 import { hitsProhibited } from "./prohibited.ts";
 import type { Claim, Portrait } from "./portrait.ts";
 import { isSignalId, sourceOf, type SignalTier } from "./signals.ts";
-import { isWithheldSignalId } from "./withheld.ts";
+import { isNonCitableSignalId } from "./withheld.ts";
 
 export const DROP_REASONS = [
   "empty_evidence",
@@ -52,9 +52,9 @@ export function validatePortrait(input: Portrait): ValidationResult {
       drops.push({ claim_type: claim.claim_type, reason: "unknown_pointer", detail: badPointer });
       continue;
     }
-    const withheld = claim.evidence.find((id) => isWithheldSignalId(id));
-    if (withheld) {
-      drops.push({ claim_type: claim.claim_type, reason: "non_citable_evidence", detail: withheld });
+    const blocked = claim.evidence.find((id) => isNonCitableSignalId(id));
+    if (blocked) {
+      drops.push({ claim_type: claim.claim_type, reason: "non_citable_evidence", detail: blocked });
       continue;
     }
     const unseen = claim.evidence.find((id) => {

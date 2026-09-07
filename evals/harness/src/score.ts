@@ -20,6 +20,9 @@ export type FixtureScore = {
   hit_rate: number | null;
   brier: number | null;
   jaccard: number;
+  derived_share: number;
+  derived_only_rate: number;
+  raw_per_claim: number;
   hits_by_tier: Record<Confidence, { n: number; hits: number }>;
 };
 
@@ -81,6 +84,19 @@ export function scoreFixture(args: {
     bucket.n += 1;
     if (c.hit) bucket.hits += 1;
   }
+  const ptrs = last.claims.map((c) => c.evidence);
+  let derived = 0;
+  let raw = 0;
+  let derivedOnly = 0;
+  for (const ev of ptrs) {
+    const d = ev.filter((id) => id.startsWith("sig.derived.")).length;
+    const r = ev.length - d;
+    derived += d;
+    raw += r;
+    if (ev.length > 0 && r === 0) derivedOnly += 1;
+  }
+  const totalPtr = derived + raw;
+  const claimN = last.claims.length;
   return {
     fixture_id: args.fixture_id,
     source: args.source,
@@ -94,6 +110,9 @@ export function scoreFixture(args: {
     hit_rate: labeled.length === 0 ? null : hits / labeled.length,
     brier: brierVals.length === 0 ? null : brierVals.reduce((a, b) => a + b, 0) / brierVals.length,
     jaccard: jaccard(claimTypes),
+    derived_share: totalPtr === 0 ? 0 : derived / totalPtr,
+    derived_only_rate: claimN === 0 ? 0 : derivedOnly / claimN,
+    raw_per_claim: claimN === 0 ? 0 : raw / claimN,
     hits_by_tier,
   };
 }

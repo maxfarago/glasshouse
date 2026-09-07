@@ -1,4 +1,4 @@
-import { isWithheldSignalId, SIGNAL_REGISTRY, sourceOf, stripWithheld, type Portrait, type SignalId, type SignalSet } from "@glasshouse/schema";
+import { isWithheldSignalId, SIGNAL_REGISTRY, sourceOf, stripForInfer, type Portrait, type SignalId, type SignalSet } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collectBrowserT2, collectT1Now } from "./collect.ts";
@@ -25,7 +25,14 @@ function srcOf(id: string): Src {
   return "CLIENT";
 }
 
-function fmt(value: unknown): string {
+function fmt(key: string, value: unknown, signals: SignalSet = {}): string {
+  if (key === "sig.edge.tcp_rtt_ms" && value == null) return "not measured";
+  if (key === "sig.client.device_memory" && value === 8 && signals["sig.client.device_memory_capped"] === true) {
+    return "8+ GB (API capped)";
+  }
+  if (key === "sig.client.netinfo.effective_type" && typeof value === "string") {
+    return `${value} (connection quality bucket, not a network type)`;
+  }
   if (value == null) return "null";
   if (typeof value === "string") return value;
   return JSON.stringify(value);
@@ -41,7 +48,7 @@ function rowsFrom(signals: SignalSet, seen: Set<string>): Row[] {
       at: Math.round(performance.now() - START),
       src: srcOf(key),
       key,
-      value: fmt(value),
+      value: fmt(key, value, signals),
       withheld: isWithheldSignalId(key),
     });
   }
@@ -63,8 +70,18 @@ export function App() {
     signalsRef.current = { ...signalsRef.current, ...next };
     const derived = derive(signalsRef.current, { now: new Date() });
     signalsRef.current = derived;
-    const extra = rowsFrom(derived, seen.current);
-    if (extra.length) setRows((r) => [...r, ...extra]);
+    setRows((r) => {
+      const extra = rowsFrom(derived, seen.current);
+      const merged = extra.length ? [...r, ...extra] : r;
+      return merged.map((row) => {
+        if (!row.key.startsWith("sig.derived.")) return row;
+        const v = derived[row.key as SignalId];
+        if (v === undefined) return row;
+        const value = fmt(row.key, v);
+        if (value === row.value) return row;
+        return { ...row, value };
+      });
+    });
   };
 
   useEffect(() => {
@@ -92,10 +109,10 @@ export function App() {
       const body = {
         session_id: id,
         pass_index: 1,
-        prompt_version: "p2",
+        prompt_version: "p3",
         tiers_available: ["T0", "T1", "T2"],
         behavior_sparse: false,
-        signals: stripWithheld(signalsRef.current),
+        signals: stripForInfer(signalsRef.current),
         sampling: "live",
       };
       setStatus("inferring");

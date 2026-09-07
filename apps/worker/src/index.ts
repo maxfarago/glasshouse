@@ -21,7 +21,10 @@ function t0(request: Request): Record<string, unknown> {
     "sig.edge.geo.postal": str(cf.postalCode),
     "sig.edge.colo": str(cf.colo),
     "sig.edge.conn_type": null,
-    "sig.edge.tcp_rtt_ms": num(cf.clientTcpRtt),
+    "sig.edge.tcp_rtt_ms": (() => {
+      const n = num(cf.clientTcpRtt);
+      return n === 0 ? null : n;
+    })(),
     "sig.edge.tls_version": str(cf.tlsVersion),
     "sig.edge.tls_cipher": str(cf.tlsCipher),
     "sig.edge.http_version": str(cf.httpProtocol),

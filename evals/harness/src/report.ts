@@ -11,6 +11,7 @@ function renderFixture(s: FixtureScore): string {
     "",
     `source: ${s.source}`,
     `hit_rate: ${pct(s.hit_rate)}  brier: ${pct(s.brier)}  drop_rate: ${pct(s.drop_rate)}  declined_rate: ${pct(s.declined_rate)}  jaccard: ${pct(s.jaccard)}`,
+    `derived_share: ${pct(s.derived_share)}  derived_only_rate: ${pct(s.derived_only_rate)}  raw_per_claim: ${s.raw_per_claim.toFixed(2)}`,
     `behavior_sparse: ${s.behavior_sparse}`,
     "",
     "### claims",
@@ -69,6 +70,10 @@ export function renderReport(args: {
     args.scores.length === 0
       ? "—"
       : (args.scores.reduce((a, s) => a + s.drop_rate, 0) / args.scores.length).toFixed(2);
+  const meanDerivedOnly =
+    args.scores.length === 0
+      ? "—"
+      : (args.scores.reduce((a, s) => a + s.derived_only_rate, 0) / args.scores.length).toFixed(2);
   return [
     `# ${args.prompt_version}`,
     "",
@@ -77,6 +82,7 @@ export function renderReport(args: {
     `fixtures: ${args.scores.length}`,
     `mean_brier: ${meanBrier}`,
     `mean_drop_rate: ${meanDrop}`,
+    `mean_derived_only_rate: ${meanDerivedOnly}`,
     "",
     "## summary",
     "",

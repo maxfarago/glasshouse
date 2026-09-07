@@ -4,7 +4,7 @@ import { loadPrompt } from "./prompt.ts";
 import { anthropicKey } from "./secret.ts";
 import { deleteSession, putSession } from "./sessions.ts";
 import type { InferInput } from "./types.ts";
-import { stripWithheld, validatePortrait } from "@glasshouse/schema";
+import { stripForInfer, validatePortrait } from "@glasshouse/schema";
 
 type LambdaEvent = {
   body?: string | null;
@@ -53,7 +53,7 @@ function routeOf(event: LambdaEvent): { method: string; path: string } {
 }
 
 async function infer(input: InferInput, stream: ResponseStream): Promise<void> {
-  const clean = { ...input, signals: stripWithheld(input.signals) };
+  const clean = { ...input, signals: stripForInfer(input.signals) };
   const promptVersion = clean.prompt_version || "p1";
   const repoRoot = process.env.LAMBDA_TASK_ROOT ?? process.cwd();
   const system = await loadPrompt(promptVersion, repoRoot);

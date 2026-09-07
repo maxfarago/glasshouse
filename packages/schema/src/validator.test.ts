@@ -78,6 +78,20 @@ describe("validatePortrait", () => {
     assert.equal(drops[0]?.detail, "sig.client.prefers_reduced_motion");
   });
 
+  it("drops infer-omit evidence pointers", () => {
+    const { drops } = validatePortrait(
+      portrait([
+        {
+          claim_type: "connection_context",
+          statement: "on cellular",
+          evidence: ["sig.client.netinfo.effective_type"],
+        },
+      ]),
+    );
+    assert.equal(drops[0]?.reason, "non_citable_evidence");
+    assert.equal(drops[0]?.detail, "sig.client.netinfo.effective_type");
+  });
+
   it("drops prohibited attributes", () => {
     const { drops } = validatePortrait(
       portrait([

@@ -20,7 +20,7 @@ package:
 	cd $(ROOT)/services/inference && pnpm bundle:lambda
 	rm -rf build/pkg && mkdir -p build/pkg/prompts
 	cp $(ROOT)/services/inference/dist/lambda.js build/pkg/lambda.js
-	cp $(ROOT)/services/inference/prompts/p1.md $(ROOT)/services/inference/prompts/p2.md build/pkg/prompts/
+	cp $(ROOT)/services/inference/prompts/p1.md $(ROOT)/services/inference/prompts/p2.md $(ROOT)/services/inference/prompts/p3.md build/pkg/prompts/
 	rm -f $(ZIP)
 	cd build/pkg && zip -q -r ../gh-inference.zip .
 

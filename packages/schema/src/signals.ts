@@ -27,6 +27,7 @@ export const SIGNAL_REGISTRY = {
   "sig.client.langs": "T1",
   "sig.client.hw_concurrency": "T1",
   "sig.client.device_memory": "T1",
+  "sig.client.device_memory_capped": "T1",
   "sig.client.max_touch": "T1",
   "sig.client.prefers_reduced_motion": "T1",
   "sig.client.prefers_color_scheme": "T1",
@@ -61,6 +62,9 @@ export const SIGNAL_REGISTRY = {
   "sig.client.intl.numbering": "T2",
   "sig.client.intl.first_day": "T2",
   "sig.client.intl.weekend": "T2",
+  "sig.client.intl.hour_cycle": "T2",
+  "sig.client.intl.measurement": "T2",
+  "sig.client.intl.direction": "T2",
   "sig.client.intl.tz_count": "T2",
   "sig.client.devices.kinds": "T2",
   "sig.client.netinfo.effective_type": "T2",
@@ -80,6 +84,14 @@ export const SIGNAL_REGISTRY = {
   "sig.derived.local_time": "derived",
   "sig.derived.privacy_posture": "derived",
   "sig.derived.net_vs_tz": "derived",
+  "sig.derived.connection_quality": "derived",
+  "sig.derived.agree.volatile_fast": "derived",
+  "sig.derived.agree.volatile_install": "derived",
+  "sig.derived.agree.fast_install": "derived",
+  "sig.derived.install_regions": "derived",
+  "sig.derived.path_vs_body": "derived",
+  "sig.derived.client_suppression": "derived",
+  "sig.derived.software_implied": "derived",
 } as const satisfies Record<string, SignalSource>;
 
 export type SignalId = keyof typeof SIGNAL_REGISTRY;

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { stripWithheld, type Claim, type ClaimType, type Declined, type Portrait, type SignalSet } from "@glasshouse/schema";
+import { stripForInfer, type Claim, type ClaimType, type Declined, type Portrait, type SignalSet } from "@glasshouse/schema";
 import { hashSignalSet } from "@glasshouse/schema/hash";
 import type { InferInput, Inference } from "./types.ts";
 
@@ -310,7 +310,7 @@ function buildClaims(signals: SignalSet): { claims: Claim[]; declined: Declined[
 export const stubInference: Inference = {
   model_id: MODEL_ID,
   async infer(input) {
-    const signals = stripWithheld(input.signals);
+    const signals = stripForInfer(input.signals);
     const { claims, declined, thin } = buildClaims(signals);
     const portrait: Portrait = {
       portrait_id: randomUUID(),
