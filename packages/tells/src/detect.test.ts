@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { derive } from "@glasshouse/signals";
-import { detectTells, stripTellsForInfer } from "./detect.ts";
+import { detectTells, stripTellsForInfer, tellsForInfer } from "./detect.ts";
 import type { SignalSet } from "@glasshouse/schema";
 
 const NOW = { now: new Date("2026-09-04T12:00:00Z") };
@@ -113,6 +113,25 @@ describe("detectTells", () => {
     assert.ok(!got.includes("timezone_vs_geo"));
   });
 
+  it("does not dump the sunday-first iso list when the set is large", () => {
+    const tells = detectTells(
+      derive(
+        {
+          "sig.edge.as_org": "Ziggo",
+          "sig.edge.geo.country": "NL",
+          "sig.edge.geo.city": "Amsterdam",
+          "sig.client.timezone": "Europe/Amsterdam",
+          "sig.client.intl.first_day": 7,
+        },
+        NOW,
+      ),
+    );
+    const hit = tells.find((t) => t.id === "install_vs_geo");
+    assert.ok(hit);
+    assert.match(hit.detail, /Sunday-first set, \d+ countries/);
+    assert.ok(!hit.detail.includes("AR, BO"));
+  });
+
   it("maps sf mono without mapping menlo", () => {
     const tells = detectTells(
       derive(
@@ -179,5 +198,40 @@ describe("detectTells", () => {
       "sig.edge.geo.country": "NL",
     });
     assert.ok(got.includes("intl_vs_ui_locale"));
+  });
+
+  it("tellsForInfer prefixes ids and drops withheld", () => {
+    const payload = tellsForInfer(detectTells(derive({ "sig.client.prefers_reduced_motion": false }, NOW)));
+    assert.ok(payload.every((t) => t.id.startsWith("tell.")));
+    assert.ok(!payload.some((t) => t.id === "tell.withheld"));
+  });
+
+  it("fires blocker_vs_fp only when bait is hidden and collectors are intact", () => {
+    const intact = ids({
+      "sig.client.blocker.present": true,
+      "sig.client.canvas_hash": "abc",
+      "sig.client.audio_hash": "def",
+      "sig.client.fonts.count": 12,
+      "sig.client.webgl_renderer": "Apple",
+      "sig.client.intl.calendar": "gregory",
+      "sig.client.intl.numbering": "latn",
+      "sig.client.intl.first_day": 1,
+    });
+    assert.ok(intact.includes("blocker_vs_fp"));
+    const emptied = ids({
+      "sig.client.blocker.present": true,
+      "sig.client.canvas_hash": null,
+      "sig.client.audio_hash": null,
+      "sig.client.fonts.count": 0,
+      "sig.client.intl.calendar": "gregory",
+    });
+    assert.ok(!emptied.includes("blocker_vs_fp"));
+  });
+
+  it("fires high_refresh at 120 and not at 60", () => {
+    assert.ok(
+      ids({ "sig.client.screen.refresh_hz": 120, "sig.client.css.update": "fast" }).includes("high_refresh"),
+    );
+    assert.ok(!ids({ "sig.client.screen.refresh_hz": 60, "sig.client.css.update": "fast" }).includes("high_refresh"));
   });
 });

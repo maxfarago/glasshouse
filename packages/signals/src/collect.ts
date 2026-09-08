@@ -160,6 +160,8 @@ export type T2Host = {
     downlink: number | null;
     saveData: boolean | null;
   };
+  refreshHz: () => number | null;
+  blockerPresent: () => boolean | null;
 };
 
 export function collectT2(host: T2Host): SignalSet {
@@ -192,5 +194,7 @@ export function collectT2(host: T2Host): SignalSet {
     "sig.client.netinfo.rtt": net.rtt,
     "sig.client.netinfo.downlink": net.downlink,
     "sig.client.netinfo.save_data": net.saveData,
+    "sig.client.screen.refresh_hz": host.refreshHz(),
+    "sig.client.blocker.present": host.blockerPresent(),
   };
 }

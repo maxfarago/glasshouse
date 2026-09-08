@@ -72,15 +72,16 @@
     "sig.client.netinfo.effective_type": "4g",
     "sig.client.netinfo.rtt": 22,
     "sig.client.netinfo.downlink": 9,
-    "sig.client.netinfo.save_data": false
+    "sig.client.netinfo.save_data": false,
+    "sig.client.screen.refresh_hz": 60,
+    "sig.client.blocker.present": true
   },
   "ground_truth": {
-    "network_evasion": { "accept": ["vpn", "mullvad"] },
-    "location_region": { "accept": ["netherlands", "dutch", "amsterdam"] },
-    "location_precision": { "accept": ["exit", "not"] },
-    "connection_context": { "accept": ["vpn", "datacenter"] },
-    "privacy_posture": { "accept": ["harden", "empty", "generic", "swiftshader", "random"] },
-    "language_profile": { "accept": ["nl"] },
-    "device_family": { "accept": ["desktop", "macbook"] }
+    "location": { "value": "country", "place_accept": ["netherlands", "nl"] },
+    "work_or_home": { "value": null },
+    "technical_expertise": { "value": "technical" },
+    "visit_reason": { "value": null },
+    "profession": { "value": null },
+    "age_cohort": { "value": null }
   }
 }

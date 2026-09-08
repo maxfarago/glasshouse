@@ -5,6 +5,7 @@ export { FONT_PROBE } from "./fonts-probe.ts";
 export { stickiness, type Stickiness } from "./stickiness.ts";
 export { weekStartName, weekStartForCountry } from "./region-sets.ts";
 export { netVsTz, type NetVsTz } from "./net-vs-tz.ts";
+export { snapRefreshHz } from "./refresh.ts";
 export { deviceFamily, type Screen } from "./device-family.ts";
 export { localTime, type LocalTime } from "./local-time.ts";
 export { privacyPosture } from "./privacy.ts";

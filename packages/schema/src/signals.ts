@@ -71,6 +71,8 @@ export const SIGNAL_REGISTRY = {
   "sig.client.netinfo.rtt": "T2",
   "sig.client.netinfo.downlink": "T2",
   "sig.client.netinfo.save_data": "T2",
+  "sig.client.screen.refresh_hz": "T2",
+  "sig.client.blocker.present": "T2",
   "sig.tls.ja4": "T3",
   "sig.tls.alpn": "T3",
   "sig.behav.pointer_jitter": "T4",

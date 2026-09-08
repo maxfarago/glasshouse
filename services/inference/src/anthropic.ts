@@ -9,41 +9,42 @@ const MAX_TOKENS = 24000;
 
 const SUBMIT_TOOL: Anthropic.Messages.Tool = {
   name: "submit_portrait",
-  description: "emit the portrait. every claim type belongs in claims or declined, not both.",
+  description: "emit the six answers. every question belongs in answers[], answered or declined.",
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["claims", "declined", "thin_signal_note"],
+    required: ["answers"],
     properties: {
-      claims: {
+      answers: {
         type: "array",
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["claim_type", "confidence", "statement", "evidence", "reasoning", "falsifier"],
+          required: ["question", "value", "evidence", "reasoning", "falsifier"],
           properties: {
-            claim_type: { type: "string" },
+            question: { type: "string" },
+            value: { type: ["string", "null"] },
+            place: { type: "string" },
             confidence: { type: "string", enum: ["HUNCH", "PLAUSIBLE", "LIKELY", "CONFIDENT"] },
-            statement: { type: "string" },
             evidence: { type: "array", items: { type: "string" } },
             reasoning: { type: "string" },
             falsifier: { type: "string" },
+            declined_reason: { type: "string" },
           },
         },
       },
-      declined: {
+      missed_tells: {
         type: "array",
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["claim_type", "reason"],
+          required: ["id", "why"],
           properties: {
-            claim_type: { type: "string" },
-            reason: { type: "string" },
+            id: { type: "string" },
+            why: { type: "string" },
           },
         },
       },
-      thin_signal_note: { type: ["string", "null"] },
     },
   },
 };
@@ -54,53 +55,69 @@ export type AnthropicInferenceOpts = {
   apiKey?: string;
 };
 
+function stripTells(tells: InferInput["tells"]): InferInput["tells"] {
+  if (!tells) return tells;
+  return tells.filter((t) => t.category !== "withheld" && t.id !== "tell.withheld" && t.id !== "withheld");
+}
+
 function userMessage(input: InferInput): string {
-  return [
+  const lines = [
     `prompt_version: ${input.prompt_version}`,
     `pass_index: ${input.pass_index}`,
     `tiers_available: ${JSON.stringify(input.tiers_available)}`,
     `behavior_sparse: ${input.behavior_sparse}`,
     `sampling: ${input.sampling}`,
     "",
+    "tells (facts about the signal set, not claims about the person; withheld omitted):",
+    JSON.stringify(stripTells(input.tells) ?? [], null, 2),
+    "",
     "signal set (raw + derived):",
     JSON.stringify(stripForInfer(input.signals), null, 2),
-  ].join("\n");
+  ];
+  if (input.sampling === "deterministic") {
+    lines.push(
+      "",
+      "sampling is deterministic: you may emit missed_tells [{id, why}] for a detector that should have fired and did not. omit missed_tells when sampling is live.",
+    );
+  }
+  return lines.join("\n");
 }
-
-const CONFIDENCE = new Set(["HUNCH", "PLAUSIBLE", "LIKELY", "CONFIDENT"]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function asNonEmpty(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function sanitizeAnswer(raw: unknown): Record<string, unknown> | null {
+  const row = asRecord(raw);
+  if (!row || typeof row.question !== "string" || row.question.length === 0) return null;
+  const declined = row.value == null;
+  if (declined) {
+    row.value = null;
+    row.declined_reason = asNonEmpty(row.declined_reason, "declined");
+    delete row.confidence;
+    if (row.place == null || row.place === "") delete row.place;
+  } else if (row.place == null || row.place === "") {
+    delete row.place;
+  }
+  if (row.confidence == null) delete row.confidence;
+  row.reasoning = asNonEmpty(row.reasoning, declined ? String(row.declined_reason) : "no reasoning emitted");
+  row.falsifier = asNonEmpty(row.falsifier, "an observation that would support a closed-set answer");
+  if (!Array.isArray(row.evidence)) row.evidence = [];
+  return row;
+}
+
 function sanitizeOutput(raw: unknown): unknown {
   const rec = asRecord(raw);
   if (!rec) return raw;
-  if (Array.isArray(rec.claims)) {
-    rec.claims = rec.claims.filter((c) => {
-      const claim = asRecord(c);
-      if (!claim) return false;
-      return (
-        typeof claim.claim_type === "string" &&
-        claim.claim_type.length > 0 &&
-        typeof claim.confidence === "string" &&
-        CONFIDENCE.has(claim.confidence) &&
-        typeof claim.statement === "string" &&
-        claim.statement.trim().length > 0
-      );
-    });
+  if (Array.isArray(rec.answers)) {
+    rec.answers = rec.answers.map(sanitizeAnswer).filter((a) => a != null);
   }
-  if (Array.isArray(rec.declined)) {
-    rec.declined = rec.declined.filter((d) => {
-      const row = asRecord(d);
-      return (
-        row &&
-        typeof row.claim_type === "string" &&
-        row.claim_type.length > 0 &&
-        typeof row.reason === "string" &&
-        row.reason.trim().length > 0
-      );
-    });
+  if (rec.missed_tells !== undefined && !Array.isArray(rec.missed_tells)) {
+    delete rec.missed_tells;
   }
   return rec;
 }

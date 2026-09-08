@@ -53,12 +53,13 @@ const installVsGeo: Detector = {
     const installWeek = weekStartName(day);
     const geoWeek = weekStartForCountry(geo);
     if (!geo || !installWeek || !geoWeek || !regions?.length) return null;
-    const regionLabel = regions.length > 8 ? `${regions.length} countries` : regions.join(", ");
+    const setLabel =
+      regions.length > 8 ? `${installWeek}-first set, ${regions.length} countries` : regions.join(", ");
     return tell(
       "install_vs_geo",
       "contradictory",
       `Week starts on ${installWeek}. Edge geo ${geo} starts on ${geoWeek}.`,
-      `first_day is ${day}. install_regions is ${regionLabel}. geo.country is ${geo}.`,
+      `first_day is ${day}. Install set is ${setLabel}. geo.country is ${geo}.`,
       [
         "sig.derived.agree.volatile_install",
         "sig.derived.install_regions",
@@ -361,6 +362,42 @@ const pwaStandalone: Detector = {
   },
 };
 
+const blockerVsFp: Detector = {
+  id: "blocker_vs_fp",
+  category: "contradictory",
+  requires: ["sig.client.blocker.present", "sig.derived.client_suppression"],
+  detect(s) {
+    if (s["sig.client.blocker.present"] !== true) return null;
+    if (!intact(s)) return null;
+    return tell(
+      "blocker_vs_fp",
+      "contradictory",
+      "Content-blocker bait was hidden. Fingerprint collectors returned values.",
+      "blocker.present is true. client_suppression is intact.",
+      ["sig.client.blocker.present", "sig.derived.client_suppression"],
+    );
+  },
+};
+
+const highRefresh: Detector = {
+  id: "high_refresh",
+  category: "mapped",
+  requires: ["sig.client.screen.refresh_hz"],
+  detect(s) {
+    const hz = asNumber(s, "sig.client.screen.refresh_hz");
+    if (hz == null || hz < 90) return null;
+    const update = asString(s, "sig.client.css.update");
+    const second = update ? `CSS update is ${update}.` : "CSS update was not reported.";
+    return tell(
+      "high_refresh",
+      "mapped",
+      `Measured refresh is ${hz} Hz. ${second}`,
+      "snapped from rAF intervals; not a model of the panel.",
+      ["sig.client.screen.refresh_hz", ...(update ? (["sig.client.css.update"] as const) : [])],
+    );
+  },
+};
+
 const withheld: Detector = {
   id: "withheld",
   category: "withheld",
@@ -395,5 +432,7 @@ export const DETECTORS: Detector[] = [
   numberingNonLatin,
   weekendNonStandard,
   pwaStandalone,
+  blockerVsFp,
+  highRefresh,
   withheld,
 ];

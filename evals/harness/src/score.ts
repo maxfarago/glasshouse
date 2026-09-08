@@ -1,34 +1,57 @@
-import { CLAIM_TYPES, TIER_MIDPOINTS, type ClaimType, type Confidence, type Drop, type GroundTruth, type Portrait } from "@glasshouse/schema";
+import {
+  QUESTIONS,
+  TIER_MIDPOINTS,
+  type Answer,
+  type Confidence,
+  type Drop,
+  type GroundTruth,
+  type Portrait,
+  type QuestionId,
+  type QuestionTruth,
+} from "@glasshouse/schema";
 
-export type ClaimScore = {
-  claim_type: ClaimType;
-  confidence: Confidence;
-  hit: boolean | null;
-  statement: string;
+export type AnswerScore = {
+  question: QuestionId;
+  value: string | null;
+  place?: string;
+  confidence?: Confidence;
+  hit: boolean;
+  declined: boolean;
 };
 
 export type FixtureScore = {
   fixture_id: string;
   source: "local" | "sanitized";
-  claims: ClaimScore[];
+  answers: AnswerScore[];
   drops: Drop[];
-  declined: Array<{ claim_type: string; reason: string }>;
-  thin_signal_note: string | null;
-  behavior_sparse: boolean;
   drop_rate: number;
   declined_rate: number;
-  hit_rate: number | null;
+  hit_rate: number;
   brier: number | null;
   jaccard: number;
   derived_share: number;
   derived_only_rate: number;
-  raw_per_claim: number;
+  tell_only_rate: number;
+  raw_per_answer: number;
+  decline_vs_guess: number | null;
   hits_by_tier: Record<Confidence, { n: number; hits: number }>;
+  confusion: Record<QuestionId, Record<string, Record<string, number>>>;
+  missed_tells: Array<{ id: string; why: string }>;
 };
 
-function hit(statement: string, accept: string[]): boolean {
-  const s = statement.toLowerCase();
+function placeHit(place: string | undefined, accept?: string[]): boolean {
+  if (!accept || accept.length === 0) return true;
+  const s = (place ?? "").toLowerCase();
   return accept.some((a) => s.includes(a.toLowerCase()));
+}
+
+export function answerMatches(answer: Answer, gt: QuestionTruth): boolean {
+  if (gt.value == null) return answer.value == null;
+  if (answer.value !== gt.value) return false;
+  if (answer.question === "location" && answer.value && answer.value !== "indeterminate") {
+    return placeHit(answer.place, gt.place_accept);
+  }
+  return true;
 }
 
 function jaccard(sets: Array<Set<string>>): number {
@@ -45,6 +68,10 @@ function jaccard(sets: Array<Set<string>>): number {
   return inter.size / union.size;
 }
 
+function label(value: string | null): string {
+  return value == null ? "decline" : value;
+}
+
 export function scoreFixture(args: {
   fixture_id: string;
   source: "local" | "sanitized";
@@ -55,23 +82,27 @@ export function scoreFixture(args: {
   const last = args.portraits.at(-1);
   if (!last) throw new Error(`no portraits for ${args.fixture_id}`);
   const lastDrops = args.dropsPerRun.at(-1) ?? [];
-  const claimTypes = args.portraits.map((p) => new Set(p.claims.map((c) => c.claim_type)));
-  const scored: ClaimScore[] = last.claims.map((c) => {
-    const gt = args.ground_truth[c.claim_type];
+  const valueSets = args.portraits.map((p) => new Set(p.answers.map((a) => `${a.question}:${label(a.value)}`)));
+
+  const scored: AnswerScore[] = last.answers.map((a) => {
+    const gt = args.ground_truth[a.question];
     return {
-      claim_type: c.claim_type,
-      confidence: c.confidence,
-      hit: gt ? hit(c.statement, gt.accept) : null,
-      statement: c.statement,
+      question: a.question,
+      value: a.value,
+      ...(a.place ? { place: a.place } : {}),
+      ...(a.confidence ? { confidence: a.confidence } : {}),
+      hit: answerMatches(a, gt),
+      declined: a.value == null,
     };
   });
-  const labeled = scored.filter((c) => c.hit !== null);
-  const hits = labeled.filter((c) => c.hit).length;
-  const produced = last.claims.length + lastDrops.length;
-  const brierVals = labeled.map((c) => {
-    const p = TIER_MIDPOINTS[c.confidence];
-    const y = c.hit ? 1 : 0;
-    return (p - y) ** 2;
+
+  const hits = scored.filter((s) => s.hit).length;
+  const produced = last.answers.filter((a) => a.value != null).length + lastDrops.length;
+  const brierVals = scored.flatMap((s) => {
+    if (s.declined || s.confidence == null) return [];
+    const p = TIER_MIDPOINTS[s.confidence];
+    const y = s.hit ? 1 : 0;
+    return [(p - y) ** 2];
   });
   const hits_by_tier: FixtureScore["hits_by_tier"] = {
     HUNCH: { n: 0, hits: 0 },
@@ -79,40 +110,67 @@ export function scoreFixture(args: {
     LIKELY: { n: 0, hits: 0 },
     CONFIDENT: { n: 0, hits: 0 },
   };
-  for (const c of labeled) {
-    const bucket = hits_by_tier[c.confidence];
+  for (const s of scored) {
+    if (!s.confidence) continue;
+    const bucket = hits_by_tier[s.confidence];
     bucket.n += 1;
-    if (c.hit) bucket.hits += 1;
+    if (s.hit) bucket.hits += 1;
   }
-  const ptrs = last.claims.map((c) => c.evidence);
+
+  const ptrs = last.answers.filter((a) => a.value != null).map((a) => a.evidence);
   let derived = 0;
   let raw = 0;
+  let tellPtrs = 0;
   let derivedOnly = 0;
+  let tellOnly = 0;
   for (const ev of ptrs) {
     const d = ev.filter((id) => id.startsWith("sig.derived.")).length;
-    const r = ev.length - d;
+    const t = ev.filter((id) => id.startsWith("tell.")).length;
+    const r = ev.filter((id) => !id.startsWith("sig.derived.") && !id.startsWith("tell.")).length;
     derived += d;
     raw += r;
+    tellPtrs += t;
     if (ev.length > 0 && r === 0) derivedOnly += 1;
+    if (ev.length > 0 && t === ev.length) tellOnly += 1;
   }
-  const totalPtr = derived + raw;
-  const claimN = last.claims.length;
+  const totalPtr = derived + raw + tellPtrs;
+  const answeredN = ptrs.length;
+
+  let shouldDecline = 0;
+  let declinedOk = 0;
+  let guessed = 0;
+  const confusion = {} as FixtureScore["confusion"];
+  for (const q of QUESTIONS) {
+    confusion[q] = {};
+    const gt = args.ground_truth[q];
+    const a = last.answers.find((x) => x.question === q);
+    const actual = label(gt.value);
+    const pred = label(a?.value ?? null);
+    confusion[q][actual] = { [pred]: 1 };
+    if (gt.value == null) {
+      shouldDecline += 1;
+      if (a?.value == null) declinedOk += 1;
+      else guessed += 1;
+    }
+  }
+
   return {
     fixture_id: args.fixture_id,
     source: args.source,
-    claims: scored,
+    answers: scored,
     drops: lastDrops,
-    declined: last.declined,
-    thin_signal_note: last.thin_signal_note,
-    behavior_sparse: last.behavior_sparse,
-    drop_rate: produced === 0 ? 0 : lastDrops.length / produced,
-    declined_rate: last.declined.length / CLAIM_TYPES.length,
-    hit_rate: labeled.length === 0 ? null : hits / labeled.length,
+    drop_rate: produced === 0 ? 0 : lastDrops.length / Math.max(produced, 1),
+    declined_rate: scored.filter((s) => s.declined).length / QUESTIONS.length,
+    hit_rate: hits / QUESTIONS.length,
     brier: brierVals.length === 0 ? null : brierVals.reduce((a, b) => a + b, 0) / brierVals.length,
-    jaccard: jaccard(claimTypes),
+    jaccard: jaccard(valueSets),
     derived_share: totalPtr === 0 ? 0 : derived / totalPtr,
-    derived_only_rate: claimN === 0 ? 0 : derivedOnly / claimN,
-    raw_per_claim: claimN === 0 ? 0 : raw / claimN,
+    derived_only_rate: answeredN === 0 ? 0 : derivedOnly / answeredN,
+    tell_only_rate: answeredN === 0 ? 0 : tellOnly / answeredN,
+    raw_per_answer: answeredN === 0 ? 0 : raw / answeredN,
+    decline_vs_guess: shouldDecline === 0 ? null : declinedOk / (declinedOk + guessed),
     hits_by_tier,
+    confusion,
+    missed_tells: last.missed_tells ?? [],
   };
 }

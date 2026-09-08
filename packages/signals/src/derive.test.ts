@@ -4,6 +4,7 @@ import { derive } from "./derive.ts";
 import { deviceFamily } from "./device-family.ts";
 import { collectT1, collectT2 } from "./collect.ts";
 import { FONT_PROBE } from "./fonts-probe.ts";
+import { snapRefreshHz } from "./refresh.ts";
 
 describe("deviceFamily", () => {
   it("buckets a 14-class macbook without naming a year", () => {
@@ -223,6 +224,8 @@ describe("collectT2", () => {
       }),
       devices: () => ["audioinput", "audiooutput", "videoinput"],
       netinfo: () => ({ effectiveType: "4g", rtt: 50, downlink: 10, saveData: false }),
+      refreshHz: () => 60,
+      blockerPresent: () => false,
     });
     assert.equal(signals["sig.client.webgl.ext_hash"], "deadbeef");
     assert.equal(signals["sig.client.webgl2_available"], true);
@@ -230,11 +233,26 @@ describe("collectT2", () => {
     assert.equal(signals["sig.client.intl.first_day"], 1);
     assert.deepEqual(signals["sig.client.devices.kinds"], ["audioinput", "audiooutput", "videoinput"]);
     assert.equal(signals["sig.client.netinfo.effective_type"], "4g");
+    assert.equal(signals["sig.client.screen.refresh_hz"], 60);
+    assert.equal(signals["sig.client.blocker.present"], false);
   });
 });
 
 describe("FONT_PROBE", () => {
   it("is a closed list of software tells", () => {
     assert.equal(FONT_PROBE.length, 30);
+  });
+});
+
+describe("snapRefreshHz", () => {
+  it("snaps 60 and 120 class intervals", () => {
+    assert.equal(snapRefreshHz(16.67), 60);
+    assert.equal(snapRefreshHz(8.33), 120);
+    assert.equal(snapRefreshHz(6.94), 144);
+  });
+
+  it("returns null for garbage", () => {
+    assert.equal(snapRefreshHz(0), null);
+    assert.equal(snapRefreshHz(-1), null);
   });
 });

@@ -1,6 +1,7 @@
 import type { SignalSet } from "@glasshouse/schema";
 import { collectT2 } from "./collect.ts";
 import { FONT_PROBE } from "./fonts-probe.ts";
+import { snapRefreshHz } from "./refresh.ts";
 
 const NOTABLE = [
   "Menlo",
@@ -301,8 +302,62 @@ export function browserNetinfo(): {
   };
 }
 
+function nextFrame(): Promise<number> {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
+export async function browserRefreshHz(): Promise<number | null> {
+  if (typeof document !== "undefined" && document.hidden) return null;
+  const deltas: number[] = [];
+  let prev = 0;
+  for (let i = 0; i < 14; i++) {
+    if (document.hidden) break;
+    const t = await nextFrame();
+    if (prev > 0) deltas.push(t - prev);
+    prev = t;
+  }
+  if (deltas.length < 8) return null;
+  const ranked = [...deltas].sort((a, b) => a - b);
+  const mid = ranked[Math.floor(ranked.length / 2)];
+  if (mid == null) return null;
+  return snapRefreshHz(mid);
+}
+
+export async function browserBlockerPresent(): Promise<boolean | null> {
+  if (typeof document === "undefined" || !document.body) return null;
+  const bait = document.createElement("div");
+  bait.className =
+    "pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads adsbox";
+  bait.id = "ads";
+  bait.style.cssText = "width:1px;height:1px;position:absolute;left:-10000px;top:-1000px;overflow:hidden";
+  bait.textContent = "&nbsp;";
+  document.body.appendChild(bait);
+  await nextFrame();
+  await nextFrame();
+  let present = false;
+  try {
+    const cs = getComputedStyle(bait);
+    present =
+      !document.body.contains(bait) ||
+      bait.offsetHeight === 0 ||
+      bait.clientHeight === 0 ||
+      cs.display === "none" ||
+      cs.visibility === "hidden" ||
+      cs.opacity === "0";
+  } finally {
+    bait.remove();
+  }
+  return present;
+}
+
 export async function collectBrowserT2(): Promise<SignalSet> {
-  const [audio, fonts, devices] = await Promise.all([browserAudioHash(), browserFonts(), browserDeviceKinds()]);
+  const [audio, fonts, devices, refreshHz, blockerPresent] = await Promise.all([
+    browserAudioHash(),
+    browserFonts(),
+    browserDeviceKinds(),
+    browserRefreshHz(),
+    browserBlockerPresent(),
+  ]);
   return collectT2({
     canvasHash: browserCanvasHash,
     webgl: browserWebglSweep,
@@ -311,5 +366,7 @@ export async function collectBrowserT2(): Promise<SignalSet> {
     intl: browserIntl,
     devices: () => devices,
     netinfo: browserNetinfo,
+    refreshHz: () => refreshHz,
+    blockerPresent: () => blockerPresent,
   });
 }

@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { stripForInfer, type Claim, type ClaimType, type Declined, type Portrait, type SignalSet } from "@glasshouse/schema";
+import {
+  QUESTIONS,
+  stripForInfer,
+  type Answer,
+  type Portrait,
+  type QuestionId,
+  type SignalSet,
+} from "@glasshouse/schema";
 import { hashSignalSet } from "@glasshouse/schema/hash";
 import type { InferInput, Inference } from "./types.ts";
 
@@ -11,307 +18,122 @@ function str(signals: SignalSet, id: keyof SignalSet): string | null {
   return typeof v === "string" ? v : null;
 }
 
-function num(signals: SignalSet, id: keyof SignalSet): number | null {
-  const v = signals[id];
-  return typeof v === "number" ? v : null;
-}
-
-function langs(signals: SignalSet): string[] {
-  const v = signals["sig.client.langs"];
-  return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-}
-
-function localTime(signals: SignalSet): { weekday: string; hour: number; timezone: string } | null {
-  const v = signals["sig.derived.local_time"];
-  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
-  const rec = v as { weekday?: unknown; hour?: unknown; timezone?: unknown };
-  if (typeof rec.weekday !== "string" || typeof rec.hour !== "number" || typeof rec.timezone !== "string") {
-    return null;
-  }
-  return { weekday: rec.weekday, hour: rec.hour, timezone: rec.timezone };
-}
-
-function claim(
-  type: ClaimType,
-  confidence: Claim["confidence"],
-  statement: string,
-  evidence: string[],
-  reasoning: string,
-  falsifier: string,
-): Claim {
+function decline(question: QuestionId, reason: string): Answer {
   return {
-    claim_id: randomUUID(),
-    claim_type: type,
-    confidence,
-    statement,
-    evidence,
-    reasoning,
-    falsifier,
+    question,
+    value: null,
+    evidence: [],
+    reasoning: reason,
+    falsifier: "an observation that would support a closed-set answer",
+    declined_reason: reason,
   };
 }
 
-function buildClaims(signals: SignalSet): { claims: Claim[]; declined: Declined[]; thin: string | null } {
-  const claims: Claim[] = [];
-  const declined: Declined[] = [];
-  const city = str(signals, "sig.edge.geo.city");
-  const country = str(signals, "sig.edge.geo.country");
+function answered(
+  question: QuestionId,
+  value: string,
+  confidence: Answer["confidence"],
+  evidence: string[],
+  reasoning: string,
+  falsifier: string,
+  place?: string,
+): Answer {
+  return { question, value, place, confidence, evidence, reasoning, falsifier };
+}
+
+function buildAnswers(signals: SignalSet): Answer[] {
   const asnType = str(signals, "sig.derived.asn_type");
-  const asOrg = str(signals, "sig.edge.as_org");
   const tz = str(signals, "sig.client.timezone");
-  const family = str(signals, "sig.derived.device_family");
-  const ua = str(signals, "sig.hdr.ua");
-  const posture = num(signals, "sig.derived.privacy_posture") ?? 0;
-  const language = langs(signals);
-  const time = localTime(signals);
+  const country = str(signals, "sig.edge.geo.country");
+  const city = str(signals, "sig.edge.geo.city");
+  const implied = signals["sig.derived.software_implied"];
+  const hasSoftware = Array.isArray(implied) && implied.length > 0;
+  const datacenter = asnType === "datacenter";
 
-  const tzLooksNl = tz?.includes("Amsterdam") === true || tz?.includes("Brussels") === true;
-  const geoUs = country === "US";
-  const vpnish = asnType === "datacenter" && tzLooksNl && geoUs;
+  const byQ = new Map<QuestionId, Answer>();
 
-  if (vpnish) {
-    claims.push(
-      claim(
-        "connection_context",
+  if (datacenter && tz) {
+    byQ.set(
+      "location",
+      answered(
+        "location",
+        "country",
         "LIKELY",
-        "vpn or datacenter exit: edge geo is us while the timezone is dutch",
-        ["sig.derived.asn_type", "sig.edge.geo.country", "sig.client.timezone"],
-        "asn type is datacenter and country/timezone disagree.",
-        "a residential asn in the same country as the timezone",
-      ),
-      claim(
-        "location_region",
-        "PLAUSIBLE",
-        "visitor is more likely in the netherlands than in the advertised us exit city",
-        ["sig.client.timezone", "sig.hdr.accept_language", "sig.edge.geo.city"],
-        "timezone and language stack point at nl; the us city is the vpn egress.",
-        "timezone matching the us colo, or a dutch residential asn with no contradiction",
-      ),
-      claim(
-        "location_precision",
-        "HUNCH",
-        "city-level placement is not available; the edge city is an exit, not a person",
-        ["sig.edge.geo.city", "sig.derived.asn_type"],
-        "datacenter geo is cheap to spoof; do not treat it as presence.",
-        "a gps sample or a residential asn in-country",
-      ),
-      claim(
-        "network_evasion",
-        "LIKELY",
-        "mullvad vpn: the us city is an exit; timezone and language are dutch and walked past it",
-        ["sig.edge.as_org", "sig.derived.asn_type", "sig.client.timezone"],
-        "datacenter asn plus geo/timezone split is a deliberate tunnel, not missing data.",
-        "a residential asn whose country matches the timezone",
+        ["sig.client.timezone", "sig.derived.asn_type"],
+        "timezone survives the exit; edge city does not.",
+        "a timezone matching the advertised exit",
+        tz.includes("Amsterdam") ? "Netherlands" : tz,
       ),
     );
-  } else if (city || country) {
-    const where = city ? `${city}, ${country ?? "unknown country"}` : (country ?? "unknown");
-    claims.push(
-      claim(
-        "location_region",
-        city ? "LIKELY" : "PLAUSIBLE",
-        `edge geo places them in ${where.toLowerCase()}`,
-        city ? ["sig.edge.geo.city", "sig.edge.geo.country"] : ["sig.edge.geo.country"],
-        "cloudflare edge geo is coarse and can be wrong near borders, but it is a real observation.",
-        "a gps sample or a language/timezone stack that contradicts this country",
-      ),
-      claim(
-        "location_precision",
-        city ? "PLAUSIBLE" : "HUNCH",
-        city
-          ? `city is named (${city.toLowerCase()}); that is still a metro, not a building`
-          : "only a country code is present; city is absent",
-        city ? ["sig.edge.geo.city"] : ["sig.edge.geo.country"],
-        "cf city is a bucket, not a coordinate.",
-        "gps or a building-level reverse geocode",
+  } else if (city && !datacenter) {
+    byQ.set(
+      "location",
+      answered(
+        "location",
+        "city",
+        "LIKELY",
+        ["sig.edge.geo.city", "sig.client.timezone"],
+        "edge city and timezone agree.",
+        "a timezone outside this metro",
+        city,
       ),
     );
   } else {
-    declined.push({ claim_type: "location_region", reason: "no geo signals" });
-    declined.push({ claim_type: "location_precision", reason: "no geo signals" });
+    byQ.set("location", decline("location", "no person-location signal survived"));
   }
 
-  if (asnType && asnType !== "unknown" && !vpnish) {
-    const homeish = asnType === "residential" || asnType === "mobile";
-    claims.push(
-      claim(
-        "connection_context",
-        homeish ? "PLAUSIBLE" : "LIKELY",
-        homeish
-          ? `connection looks ${asnType}, consistent with home or pocket rather than a hosted exit`
-          : `connection looks ${asnType} (${asOrg ?? "unknown org"})`,
-        ["sig.derived.asn_type", "sig.edge.as_org"],
-        "asn type is a string-match on as_org, not an rDNS lookup.",
-        "an as_org that classifies as a different asn type",
+  if (asnType === "corporate" || asnType === "education") {
+    byQ.set(
+      "work_or_home",
+      answered("work_or_home", "work", "LIKELY", ["sig.derived.asn_type"], "org asn.", "a residential asn"),
+    );
+  } else if (asnType === "residential") {
+    byQ.set(
+      "work_or_home",
+      answered("work_or_home", "home", "HUNCH", ["sig.derived.asn_type"], "residential asn only.", "a corporate asn"),
+    );
+  } else {
+    byQ.set("work_or_home", decline("work_or_home", "datacenter or unknown asn"));
+  }
+
+  if (hasSoftware) {
+    byQ.set(
+      "technical_expertise",
+      answered(
+        "technical_expertise",
+        "expert",
+        "PLAUSIBLE",
+        ["sig.derived.software_implied"],
+        "mapped developer software.",
+        "no probe-hit fonts",
       ),
     );
-  } else if (!vpnish) {
-    declined.push({ claim_type: "connection_context", reason: "asn type unknown" });
-  }
-
-  if (family) {
-    claims.push(
-      claim(
-        "device_family",
+    byQ.set(
+      "profession",
+      answered(
+        "profession",
+        "software_engineering",
         "PLAUSIBLE",
-        `hardware class is ${family.toLowerCase()}`,
-        ["sig.derived.device_family", "sig.client.screen", "sig.client.dpr"],
-        "resolution bucket plus touch points; not a specific sku.",
-        "a screen size that lands in a different bucket",
+        ["tell.software_from_font", "sig.derived.software_implied"],
+        "mapped from fonts.",
+        "probe hits that do not map to a toolchain",
       ),
     );
   } else {
-    declined.push({ claim_type: "device_family", reason: "no screen/dpr" });
+    byQ.set("technical_expertise", decline("technical_expertise", "no mapped software tell"));
+    byQ.set("profession", decline("profession", "no mapped tell"));
   }
 
-  if (ua) {
-    const chrome = /Chrome\//.test(ua) && !/Edg\//.test(ua);
-    const safari = /Safari\//.test(ua) && !/Chrome\//.test(ua);
-    const mac = /Macintosh/.test(ua);
-    const ios = /iPhone|iPad/.test(ua);
-    const label = [
-      ios ? "ios" : mac ? "mac" : null,
-      chrome ? "chrome" : safari ? "safari" : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
-    if (label) {
-      claims.push(
-        claim(
-          "os_browser_posture",
-          "LIKELY",
-          `ua reads as ${label}`,
-          ["sig.hdr.ua"],
-          "ua is generic on ios and spoofable everywhere; still the observation we have.",
-          "a client hint platform that contradicts the ua token",
-        ),
-      );
-    }
-  }
+  byQ.set("visit_reason", decline("visit_reason", "no referrer"));
+  byQ.set("age_cohort", decline("age_cohort", "no generational software tell"));
 
-  if (language.length) {
-    const joined = language.join(", ").toLowerCase();
-    claims.push(
-      claim(
-        "language_profile",
-        "PLAUSIBLE",
-        `accept/client languages are ${joined}`,
-        language.length && signals["sig.hdr.accept_language"]
-          ? ["sig.client.langs", "sig.hdr.accept_language"]
-          : ["sig.client.langs"],
-        "order is a preference, not proof of nativeness.",
-        "a language list with a different primary tag",
-      ),
-    );
-  }
-
-  if (time) {
-    const workish = time.hour >= 9 && time.hour < 18 && time.weekday !== "Saturday" && time.weekday !== "Sunday";
-    claims.push(
-      claim(
-        "time_context",
-        "HUNCH",
-        `local time is ${time.weekday.toLowerCase()} ${time.hour}:00 (${time.timezone}), ${workish ? "inside conventional work hours" : "outside conventional work hours"}`,
-        ["sig.derived.local_time", "sig.client.timezone"],
-        "work-hours is a cultural default, not an employment detector.",
-        "a timezone that shifts this timestamp out of the stated bucket",
-      ),
-    );
-  }
-
-  if (posture >= 5) {
-    claims.push(
-      claim(
-        "privacy_posture",
-        "LIKELY",
-        `the client returned ${posture} empty or generic signals; this looks like deliberate hardening, not a failed collect`,
-        ["sig.derived.privacy_posture"],
-        "null canvas/audio/fonts/geo is itself a signal.",
-        "a dense canvas/font/webgl set on a later pass",
-      ),
-    );
-  } else if (posture <= 1) {
-    claims.push(
-      claim(
-        "privacy_posture",
-        "HUNCH",
-        "almost every collector returned a value; this looks like default browser posture, not lockdown",
-        ["sig.derived.privacy_posture"],
-        "low null count is the inverse of the empty-state screen.",
-        "randomized canvas or a fonts.count of zero",
-      ),
-    );
-  }
-
-  claims.push(
-    claim(
-      "visit_intent",
-      "CONFIDENT",
-      "they are here to see what this site says about them",
-      [],
-      "barnum: this would apply to anyone who loaded the page.",
-      "a referer from a specific campaign",
-    ),
-  );
-
-  declined.push(
-    { claim_type: "age_cohort", reason: "no signal supports an age band" },
-    { claim_type: "employment_sector", reason: "no employer-grade asn or rDNS" },
-    { claim_type: "employer_or_org", reason: "no employer-grade asn or rDNS" },
-  );
-
-  if (!claims.some((c) => c.claim_type === "residency_status")) {
-    declined.push({
-      claim_type: "residency_status",
-      reason: "stub does not infer tenure or mobility",
-    });
-  }
-  if (!claims.some((c) => c.claim_type === "device_tier")) {
-    declined.push({ claim_type: "device_tier", reason: "stub does not price hardware" });
-  }
-  if (!claims.some((c) => c.claim_type === "technical_sophistication")) {
-    declined.push({
-      claim_type: "technical_sophistication",
-      reason: "stub leaves sophistication to a real model",
-    });
-  }
-  if (!claims.some((c) => c.claim_type === "network_evasion")) {
-    if (asOrg && /private relay/i.test(asOrg)) {
-      claims.push(
-        claim(
-          "network_evasion",
-          "LIKELY",
-          "icloud private relay: the edge country is an apple egress, not a presence",
-          ["sig.edge.as_org", "sig.derived.asn_type"],
-          "relay is a chosen network defense; client signals that remain are what it failed to hide.",
-          "a residential or mobile carrier asn",
-        ),
-      );
-    } else {
-      declined.push({
-        claim_type: "network_evasion",
-        reason: "no vpn, relay, or datacenter contradiction",
-      });
-    }
-  }
-  declined.push({
-    claim_type: "installed_software",
-    reason: "no protocol-handler or font-probe hits in this signal set",
-  });
-
-  const present = Object.values(signals).filter((v) => v != null && v !== "").length;
-  const thin =
-    posture >= 5 || present < 8
-      ? "sparse input: most collectors returned null, generic, or randomized values"
-      : null;
-
-  return { claims, declined, thin };
+  return QUESTIONS.map((q) => byQ.get(q) ?? decline(q, "not emitted"));
 }
 
 export const stubInference: Inference = {
   model_id: MODEL_ID,
   async infer(input) {
     const signals = stripForInfer(input.signals);
-    const { claims, declined, thin } = buildClaims(signals);
     const portrait: Portrait = {
       portrait_id: randomUUID(),
       session_id: input.session_id,
@@ -319,12 +141,9 @@ export const stubInference: Inference = {
       prompt_version: input.prompt_version || PROMPT_VERSION,
       model_id: MODEL_ID,
       sampling: input.sampling,
-      signal_set_hash: hashSignalSet(signals),
+      payload_hash: hashSignalSet(signals),
       tiers_available: input.tiers_available,
-      claims,
-      declined,
-      thin_signal_note: thin,
-      behavior_sparse: input.behavior_sparse,
+      answers: buildAnswers(signals),
     };
     return portrait;
   },

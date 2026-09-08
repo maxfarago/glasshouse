@@ -3,6 +3,7 @@ import path from "node:path";
 import { resolveInference } from "@glasshouse/inference";
 import { stripForInfer, validatePortrait, type Drop, type Portrait } from "@glasshouse/schema";
 import { derive } from "@glasshouse/signals";
+import { detectTells, tellsForInfer } from "@glasshouse/tells";
 import { clipToTiers, loadFixtures } from "./load.ts";
 import { renderReport } from "./report.ts";
 import { scoreFixture } from "./score.ts";
@@ -11,20 +12,33 @@ function repoRoot(): string {
   return path.resolve(import.meta.dirname, "../../..");
 }
 
+function argv(): string[] {
+  return process.argv.filter((a) => a !== "--");
+}
+
 function arg(flag: string, fallback: string): string {
-  const argv = process.argv.filter((a) => a !== "--");
-  const i = argv.indexOf(flag);
+  const args = argv();
+  const i = args.indexOf(flag);
   if (i < 0) return fallback;
-  const v = argv[i + 1];
+  const v = args[i + 1];
   return v ? v : fallback;
 }
 
 export async function run(): Promise<string> {
   const promptVersion = arg("--prompt", "stub");
   const repeats = Number.parseInt(arg("--repeats", "3"), 10);
+  const onlyRaw = arg("--only", "");
+  const only = onlyRaw
+    ? new Set(
+        onlyRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      )
+    : null;
   const root = repoRoot();
   const inference = await resolveInference(promptVersion, root);
-  const fixtures = await loadFixtures(root);
+  const fixtures = (await loadFixtures(root)).filter((f) => (only ? only.has(f.id) : true));
   if (fixtures.length === 0) throw new Error("no fixtures found in evals/fixtures");
 
   const scores = [];
@@ -32,7 +46,9 @@ export async function run(): Promise<string> {
     const portraits: Portrait[] = [];
     const dropsPerRun: Drop[][] = [];
     const clipped = clipToTiers(fixture.signals, fixture.tiers_available);
-    const signals = stripForInfer(derive(clipped, { now: new Date(fixture.eval_at) }));
+    const derived = derive(clipped, { now: new Date(fixture.eval_at) });
+    const tells = tellsForInfer(detectTells(derived));
+    const signals = stripForInfer(derived);
     console.error(`[eval] ${fixture.id} × ${repeats} via ${inference.model_id}`);
     for (let i = 0; i < repeats; i++) {
       const raw = await inference.infer({
@@ -42,6 +58,7 @@ export async function run(): Promise<string> {
         tiers_available: fixture.tiers_available,
         behavior_sparse: fixture.behavior_sparse,
         signals,
+        tells,
         sampling: "deterministic",
       });
       const { portrait, drops } = validatePortrait(raw);

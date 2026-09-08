@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Claim, Portrait } from "./portrait.ts";
+import type { Answer, Portrait } from "./portrait.ts";
+import { QUESTIONS } from "./questions.ts";
 import { validatePortrait } from "./validator.ts";
 
-function portrait(claims: Array<Partial<Claim> & Pick<Claim, "claim_type" | "evidence" | "statement">>): Portrait {
+function blank(): Answer {
+  return {
+    question: "work_or_home",
+    value: "home",
+    confidence: "LIKELY",
+    evidence: ["sig.derived.asn_type"],
+    reasoning: "residential asn",
+    falsifier: "a datacenter asn",
+  };
+}
+
+function portrait(answers: Answer[]): Portrait {
+  const byQ = new Map(answers.map((a) => [a.question, a]));
   return {
     portrait_id: "p",
     session_id: "s",
@@ -11,119 +24,115 @@ function portrait(claims: Array<Partial<Claim> & Pick<Claim, "claim_type" | "evi
     prompt_version: "stub",
     model_id: "stub-v0",
     sampling: "deterministic",
-    signal_set_hash: "abc",
+    payload_hash: "abc",
     tiers_available: ["T0", "T1"],
-    claims: claims.map((c, i) => ({
-      claim_id: `c${i}`,
-      confidence: "LIKELY",
-      reasoning: "chain",
-      falsifier: "counterexample",
-      ...c,
-    })),
-    declined: [],
-    thin_signal_note: null,
-    behavior_sparse: false,
+    answers: QUESTIONS.map((q) => byQ.get(q) ?? { ...blank(), question: q, value: null, declined_reason: "pad", confidence: undefined }),
   };
 }
 
 describe("validatePortrait", () => {
-  it("drops empty evidence", () => {
+  it("force-declines empty evidence", () => {
     const { portrait: out, drops } = validatePortrait(
-      portrait([{ claim_type: "visit_intent", statement: "they came to look", evidence: [] }]),
+      portrait([{ ...blank(), evidence: [] }]),
     );
-    assert.equal(out.claims.length, 0);
+    const row = out.answers.find((a) => a.question === "work_or_home");
+    assert.equal(row?.value, null);
     assert.equal(drops[0]?.reason, "empty_evidence");
   });
 
-  it("drops unknown pointers", () => {
+  it("force-declines unknown pointers", () => {
     const { drops } = validatePortrait(
-      portrait([{ claim_type: "location_region", statement: "nl", evidence: ["sig.nope"] }]),
+      portrait([{ ...blank(), question: "location", value: "country", evidence: ["sig.nope"] }]),
     );
     assert.equal(drops[0]?.reason, "unknown_pointer");
   });
 
-  it("drops pointers from unavailable tiers", () => {
+  it("force-declines pointers from unavailable tiers", () => {
     const { drops } = validatePortrait(
-      portrait([{ claim_type: "location_region", statement: "nl", evidence: ["sig.tls.ja4"] }]),
+      portrait([{ ...blank(), question: "location", value: "country", evidence: ["sig.tls.ja4"] }]),
     );
     assert.equal(drops[0]?.reason, "tier_not_available");
   });
 
-  it("allows derived pointers regardless of tiers_available", () => {
+  it("allows derived and tell pointers", () => {
     const { portrait: out, drops } = validatePortrait(
       portrait([
         {
-          claim_type: "device_family",
-          statement: "macbook class",
-          evidence: ["sig.derived.device_family"],
+          ...blank(),
+          question: "profession",
+          value: "software_engineering",
+          evidence: ["tell.software_from_font", "sig.derived.software_implied"],
         },
       ]),
     );
     assert.equal(drops.length, 0);
-    assert.equal(out.claims.length, 1);
+    assert.equal(out.answers.find((a) => a.question === "profession")?.value, "software_engineering");
   });
 
-  it("drops withheld evidence pointers", () => {
+  it("force-declines withheld evidence", () => {
     const { portrait: out, drops } = validatePortrait(
       portrait([
         {
-          claim_type: "os_browser_posture",
-          statement: "reduced motion is on",
+          ...blank(),
+          question: "age_cohort",
+          value: "35_49",
+          confidence: "HUNCH",
           evidence: ["sig.client.prefers_reduced_motion"],
         },
       ]),
     );
-    assert.equal(out.claims.length, 0);
+    assert.equal(out.answers.find((a) => a.question === "age_cohort")?.value, null);
     assert.equal(drops[0]?.reason, "non_citable_evidence");
-    assert.equal(drops[0]?.detail, "sig.client.prefers_reduced_motion");
   });
 
-  it("drops infer-omit evidence pointers", () => {
-    const { drops } = validatePortrait(
-      portrait([
-        {
-          claim_type: "connection_context",
-          statement: "on cellular",
-          evidence: ["sig.client.netinfo.effective_type"],
-        },
-      ]),
-    );
-    assert.equal(drops[0]?.reason, "non_citable_evidence");
-    assert.equal(drops[0]?.detail, "sig.client.netinfo.effective_type");
-  });
-
-  it("drops prohibited attributes", () => {
-    const { drops } = validatePortrait(
-      portrait([
-        {
-          claim_type: "residency_status",
-          statement: "likely an undocumented immigrant",
-          evidence: ["sig.edge.geo.country"],
-        },
-      ]),
-    );
-    assert.equal(drops[0]?.reason, "prohibited_attribute");
-  });
-
-  it("keeps the higher-confidence duplicate", () => {
+  it("caps age_cohort above HUNCH", () => {
     const { portrait: out, drops } = validatePortrait(
       portrait([
         {
-          claim_type: "location_region",
-          statement: "guess",
-          evidence: ["sig.edge.geo.country"],
-          confidence: "HUNCH",
-        },
-        {
-          claim_type: "location_region",
-          statement: "netherlands",
-          evidence: ["sig.edge.geo.country"],
+          ...blank(),
+          question: "age_cohort",
+          value: "25_34",
           confidence: "LIKELY",
+          evidence: ["sig.derived.device_family"],
         },
       ]),
     );
-    assert.equal(out.claims.length, 1);
-    assert.equal(out.claims[0]?.confidence, "LIKELY");
-    assert.equal(drops[0]?.reason, "duplicate_claim_type");
+    assert.equal(out.answers.find((a) => a.question === "age_cohort")?.confidence, "HUNCH");
+    assert.equal(drops[0]?.reason, "age_capped");
+  });
+
+  it("force-declines invalid closed-set values", () => {
+    const { portrait: out, drops } = validatePortrait(
+      portrait([{ ...blank(), value: "apartment" }]),
+    );
+    assert.equal(out.answers.find((a) => a.question === "work_or_home")?.value, null);
+    assert.equal(drops[0]?.reason, "invalid_value");
+  });
+
+  it("strips confidence on decline", () => {
+    const { portrait: out, drops } = validatePortrait(
+      portrait([
+        {
+          ...blank(),
+          value: null,
+          confidence: "LIKELY",
+          declined_reason: "datacenter asn",
+        },
+      ]),
+    );
+    const row = out.answers.find((a) => a.question === "work_or_home");
+    assert.equal(row?.confidence, undefined);
+    assert.ok(drops.some((d) => d.reason === "decline_shape"));
+  });
+
+  it("always returns six answers", () => {
+    const { portrait: out } = validatePortrait(
+      portrait([{ ...blank(), question: "location", value: "city", evidence: ["sig.edge.geo.city"] }]),
+    );
+    assert.equal(out.answers.length, 6);
+    assert.deepEqual(
+      out.answers.map((a) => a.question),
+      QUESTIONS,
+    );
   });
 });

@@ -71,15 +71,16 @@
     "sig.client.netinfo.effective_type": null,
     "sig.client.netinfo.rtt": null,
     "sig.client.netinfo.downlink": null,
-    "sig.client.netinfo.save_data": null
+    "sig.client.netinfo.save_data": null,
+    "sig.client.screen.refresh_hz": null,
+    "sig.client.blocker.present": null
   },
   "ground_truth": {
-    "location_region": { "accept": ["nl", "netherlands"] },
-    "device_family": { "accept": ["iphone"] },
-    "os_browser_posture": { "accept": ["ios", "safari"] },
-    "privacy_posture": { "accept": ["hardening", "empty", "generic"] },
-    "connection_context": { "accept": ["datacenter", "relay", "private"] },
-    "network_evasion": { "accept": ["relay", "icloud", "private"] },
-    "language_profile": { "accept": ["en"] }
+    "location": { "value": null },
+    "work_or_home": { "value": null },
+    "technical_expertise": { "value": null },
+    "visit_reason": { "value": null },
+    "profession": { "value": null },
+    "age_cohort": { "value": null }
   }
 }

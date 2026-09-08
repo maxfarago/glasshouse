@@ -72,6 +72,9 @@ importers:
       '@glasshouse/signals':
         specifier: workspace:*
         version: link:../../packages/signals
+      '@glasshouse/tells':
+        specifier: workspace:*
+        version: link:../../packages/tells
     devDependencies:
       '@types/node':
         specifier: ^24.3.0

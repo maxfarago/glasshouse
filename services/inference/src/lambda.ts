@@ -53,7 +53,13 @@ function routeOf(event: LambdaEvent): { method: string; path: string } {
 }
 
 async function infer(input: InferInput, stream: ResponseStream): Promise<void> {
-  const clean = { ...input, signals: stripForInfer(input.signals) };
+  const clean = {
+    ...input,
+    signals: stripForInfer(input.signals),
+    tells: (input.tells ?? []).filter(
+      (t) => t.category !== "withheld" && t.id !== "tell.withheld" && t.id !== "withheld",
+    ),
+  };
   const promptVersion = clean.prompt_version || "p1";
   const repoRoot = process.env.LAMBDA_TASK_ROOT ?? process.cwd();
   const system = await loadPrompt(promptVersion, repoRoot);

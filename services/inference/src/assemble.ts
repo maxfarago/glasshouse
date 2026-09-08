@@ -1,9 +1,24 @@
 import { randomUUID } from "node:crypto";
-import { stripForInfer, type ModelOutput, type Portrait } from "@glasshouse/schema";
+import { QUESTIONS, stripForInfer, type Answer, type ModelOutput, type Portrait, type QuestionId } from "@glasshouse/schema";
 import { hashSignalSet } from "@glasshouse/schema/hash";
 import type { InferInput } from "./types.ts";
 
+function decline(question: QuestionId, reason: string): Answer {
+  return {
+    question,
+    value: null,
+    evidence: [],
+    reasoning: reason,
+    falsifier: "an observation that would support a closed-set answer",
+    declined_reason: reason,
+  };
+}
+
 export function assemblePortrait(input: InferInput, output: ModelOutput, modelId: string): Portrait {
+  const byQ = new Map<QuestionId, Answer>();
+  for (const a of output.answers) {
+    if (!byQ.has(a.question)) byQ.set(a.question, a);
+  }
   return {
     portrait_id: randomUUID(),
     session_id: input.session_id,
@@ -11,11 +26,9 @@ export function assemblePortrait(input: InferInput, output: ModelOutput, modelId
     prompt_version: input.prompt_version,
     model_id: modelId,
     sampling: input.sampling,
-    signal_set_hash: hashSignalSet(stripForInfer(input.signals)),
+    payload_hash: hashSignalSet(stripForInfer(input.signals)),
     tiers_available: input.tiers_available,
-    claims: output.claims.map((c) => ({ ...c, claim_id: randomUUID() })),
-    declined: output.declined,
-    thin_signal_note: output.thin_signal_note,
-    behavior_sparse: input.behavior_sparse,
+    answers: QUESTIONS.map((q) => byQ.get(q) ?? decline(q, "not emitted")),
+    missed_tells: input.sampling === "deterministic" ? output.missed_tells : undefined,
   };
 }

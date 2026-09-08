@@ -1,5 +1,13 @@
 import type { ModelOutput, Portrait, SignalSet, SignalTier } from "@glasshouse/schema";
 
+export type InferTell = {
+  id: string;
+  category: string;
+  headline: string;
+  detail: string;
+  evidence: string[];
+};
+
 export type InferInput = {
   session_id: string;
   pass_index: number;
@@ -7,6 +15,7 @@ export type InferInput = {
   tiers_available: SignalTier[];
   behavior_sparse: boolean;
   signals: SignalSet;
+  tells?: InferTell[];
   sampling: "deterministic" | "live";
 };
 
